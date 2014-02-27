@@ -1,0 +1,102 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>
+TFTP Project
+</title>
+<style type="text/css">
+.javaclass {
+   text-decoration: underline;
+   font-style: italic; 
+}
+a { 
+	color: green;
+}
+</style>
+</head>
+<body style="padding:2em;font-family:Verdana,sans-serif;width:85%;">
+
+
+<h2 style="border-bottom:orange thin solid;">TFTP Project</h2>
+<h4>by: burt rosenberg<br>at: university of miami</h4>
+
+<p>
+<div style="float:right;padding:3em;padding-right:0em;width=40%;text-align:center;color:orange;" >
+<img src="http://upload.wikimedia.org/wikipedia/en/3/3a/Tftp-wrq.svg" width="100%"/><br>
+A Write Request packet destined for the Well Known Port</a>
+</div>
+
+<p>
+<b style="color:orange;">The Trivial File Transfer Protocol</b>
+<p>
+
+TFTP was first defined in 1981 by RFC 783, although the RFC does refer to an earlier
+"IEN", so it is really the second definition. Currently <a href="http://www.faqs.org/rfcs/rfc1350.html">RFC 1350</a> 
+is the best reference.
+What is defined is a truly simple protocol for transferring files using the UDP
+protocol. Studying the protocol you will learn about achieving reliability by using
+a positive acknowledgement with retry scheme; and will see some of the pitfalls of
+even a simple protocol. You will also learn to construct and parse databuffers that
+become packets. 
+
+<p>
+<b style="color:orange;">Instructions</b>
+<p><p>
+Please look at the proto-<a href="http://www.cs.miami.edu/home/burt/learning/Csc524.132/workbook/mytftp.txt">man page for mytftp</a>. 
+<p>
+Your program should that options, and should use getopt to parse the option string.
+Getopt is a standard C library call that makes command line options easy, and will 
+also insure that your command line tool follows the same conventions as every other
+command line tool in the unix tool set. It will implement even rules you don't know 
+about!
+<p>
+<em>Please work in groups of two.</em> One person writes the server code and other
+the client code. You might consider writing mytftp-server.c and mytftp-client.c and
+finally linking them together with mytftp.c to get a combination of you and your 
+partner's code
+<p>
+Ports 3000-3999 are open on the AWS machines. Two programs cannot bind to the 
+same port, so the well known port for your tftp server must be adjustable, to avoid
+other people's ports.
+<p>
+Make a single threaded server at first. For extra-credit make a server capable of
+simultaneously handling multiple requests.
+
+<p>
+<b style="color:orange;">Steps</b>
+<p>
+<ol>
+<li>First get packets to flow, like use netbounce.
+<li>Write code to construct and parse packets
+<li>Get the code to step through the major motions: responding
+with acks, moving to a new port number.
+<li>Now open, read and write files.
+<li>Add retries and test more error paths, simulating dropped, duplicated and
+out of order packets.
+<li>Optional: remove the single-threaded requirement.
+</ol>
+
+<p>
+<b style="color:orange;">Submitting</b>
+<p>
+Create a proj2 directory and put your files there. There should be a Makefile and a 
+mytftp product. Show your test suite with a test target in your Makefile. Your
+Makefile should contain a clean target. Commit only the sources and test input files.
+Do not commit binaries.
+
+
+<div style="border-top:orange thin solid;padding-top:2em;margin-top:2em;">
+<em>
+<a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US"><img alt="Creative Commons License" style="border-width:0" src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" /></a><br />This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+<p>
+Author: Burton Rosenberg
+<br>
+Created: January 18, 2014
+<br>
+Last Update: January 18, 2014
+</em>
+</div>
+
+</body>
+</html>
