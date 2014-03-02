@@ -10,5 +10,12 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
+
+// available on range [1024, 65535]
+#define LISTEN_PORT 3333
+#define MAX_BUFFER_LEN 100
+
+enum {RRQ, WRQ, DATA, ACK, ERROR} tftp_op;
 
 #endif
