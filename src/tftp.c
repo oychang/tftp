@@ -1,9 +1,11 @@
 #include "tftp.h"
 
+// Process command line arguments with getopt and then delegate
+// to the correct half of the project.
+// Valuable: http://www.ibm.com/developerworks/aix/library/au-unix-getopt.html
 int
 main(int argc, char *argv[])
 {
-    // http://www.ibm.com/developerworks/aix/library/au-unix-getopt.html
     static const char * optstr = "lp:vrwh";
     int is_server = false;
     int is_verbose = false;
@@ -43,7 +45,7 @@ main(int argc, char *argv[])
 
     if (is_server == true) {
         port = (port == -1) ? DEFAULT_SERVER_PORT : port;
-        log("port=%d; is_verbose=%d\n", port, is_verbose);
+        log("args are port=%d, is_verbose=%d\n", port, is_verbose);
         return tftp_server(port, is_verbose);
     }
 
@@ -53,7 +55,7 @@ main(int argc, char *argv[])
         print_usage();
         return EXIT_FAILURE;
     } else {
-        log("port=%d; is_verbose=%d; is_read=%d; file=%s; host=%s\n",
+        log("args are port=%d, is_verbose=%d, is_read=%d, file=%s, host=%s\n",
             port, is_verbose, is_read, file, host);
     }
 
