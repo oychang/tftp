@@ -1,13 +1,11 @@
 CC = gcc
 LD = $(CC)
 CFLAGS = -Wall -Wextra -Werror -O2
-VPATH = src/server
+VPATH = src src/server
 
 
-default: server
-server: server.c server.h
-	$(CC) $(CFLAGS) -c $< -o bin/$@
-
+tftp: server.o tftp.c tftp.h Boolean.h Logging.h
+server.o: server.c server.h Boolean.h Logging.h
 
 .PHONY: clean test
 clean:

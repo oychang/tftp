@@ -12,10 +12,30 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-// available on range [1024, 65535]
-#define LISTEN_PORT 3333
-#define MAX_BUFFER_LEN 100
+#include "../Boolean.h"
+#include "../Logging.h"
 
-enum {RRQ, WRQ, DATA, ACK, ERROR} tftp_op;
+// available on range [1024, 65535]
+#define MAX_BUFFER_LEN 128
+#define MAX_STRING_LEN 128
+typedef char tftp_packet[MAX_BUFFER_LEN];
+typedef char string[MAX_STRING_LEN];
+
+enum tftp_opcode {RRQ, WRQ, DATA, ACK, ERROR, INVALID};
+enum error_codes {
+    NOTDEFINED, FILENOUTFOUND,
+    ACCESSVIOLATION, DISKFULL,
+    ILLEGALOP, UNKNOWNTID,
+    FILEALREADYEXISTS, NOSUCHUSER
+};
+struct tftp_session {
+    enum {IDLE, RECV, SEND} status;
+    string                  fn;
+    int                     ports[2];
+    size_t                  block_n;
+};
+
+
+int tftp_server(int port, int is_verbose);
 
 #endif
