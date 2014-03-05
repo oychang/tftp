@@ -1,10 +1,16 @@
 CC = gcc
 LD = $(CC)
 CFLAGS = -Wall -Wextra -Werror -O2
-
 VPATH = src/server
 
-server: server.c server.h
 
+default: server
+server: server.c server.h
+	$(CC) $(CFLAGS) -c $< -o bin/$@
+
+
+.PHONY: clean test
 clean:
-	rm *.o
+	rm -f *.o
+test:
+	echo 'to be implemented'
