@@ -36,6 +36,13 @@ struct tftp_session {
 };
 
 
+// Main jumping off point for operation.
+// port: port to listen on for read/write requests
+// is_verbose: true/false flag that indicates whether or not to log
 int tftp_server(int port, int is_verbose);
+int get_udp_sockfd(void);
+void set_reusable_ports(int sockfd);
+void setup_my_sin(struct sockaddr_in * sin, int port);
+// void listen_respond_loop(int sockfd, struct sockaddr_in * my_addr);
 
 #endif
