@@ -1,0 +1,134 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include "Logging.h"
+
+#define MYPORT 3335
+#define MAXBUFLEN 516
+
+int main(int argc, char *argv[]) {
+
+  int sockfd;
+  struct sockaddr_in their_addr;
+  struct hostent *he;
+  struct sockaddr_in my_addr;
+  unsigned int addr_len;
+  char buf[MAXBUFLEN];
+  int numbytes;
+  int vflag = 0;
+  int rflag = 0;
+  int wflag = 0;
+  char *pvalue = NULL;
+  char *file_name = NULL;
+  char *host_name = NULL;
+  int index;
+  int argument;
+  int bufferPos;
+
+  while ((argument = getopt(argc, argv, "vrwp:")) != -1) {
+    switch (argument) {
+      case 'v':
+        VERBOSE = 1;
+        break;
+      case 'r':
+        rflag = 1;
+        break;
+      case 'w':
+        wflag = 1;
+        break;
+      case 'p':
+        pvalue = optarg;
+        break;
+      default:
+        abort();
+    }
+  }
+  file_name = argv[optind];
+  host_name = argv[optind + 1];
+
+  if ((he = gethostbyname(host_name)) == NULL) {
+    perror("gethostbyname");
+    exit(1);
+  }
+  if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+    perror("socket");
+    exit(1);
+  }
+  their_addr.sin_family = AF_INET;
+  if(strcmp(argv[1], "-p") == 0) {
+    their_addr.sin_port = htons(atoi(pvalue));
+  } else {
+    their_addr.sin_port = htons(MYPORT);
+  }
+  their_addr.sin_addr = *((struct in_addr *)he->h_addr);
+  memset(&(their_addr.sin_zero), '\0', 8);
+
+  // Pack and send the initial read/write request; establish connection
+  // if rflag is set, opcode 01; if wflag is set, opcode 02
+  bufferPos = 0;
+  if (rflag) {
+    buf[bufferPos] = '0';
+    bufferPos++;
+    buf[bufferPos] = '1';
+    bufferPos++;
+  } else if (wflag) {
+    buf[bufferPos] = '0';
+    bufferPos++;
+    buf[bufferPos] = '2';
+    bufferPos++;
+  } else {
+    printf("ERROR: No r/w designation given.\n");
+    exit(1);
+  }
+
+  for (index = 0; index < strlen(file_name); index++) {
+    buf[bufferPos] = file_name[index];
+    bufferPos++;
+  }
+
+  printf("The packet so far: \n");
+  for (index = 0; index < strlen(buf); index++) {
+    printf("%c", buf[index]);
+  }
+  printf("\n");
+
+  if ((numbytes = sendto(sockfd, file_name, strlen(file_name), 0, 
+			 (struct sockaddr *)&their_addr, 
+			 sizeof(struct sockaddr))) == -1) {
+    perror("sendto");
+    exit(1);
+  }
+  printf("send %d bytes to %s\n", numbytes, 
+	 inet_ntoa(their_addr.sin_addr));
+
+  addr_len = sizeof(struct sockaddr_in);
+  getsockname(sockfd, (struct sockaddr *)&my_addr, &addr_len);
+  printf("sent from port %d\n", ntohs(my_addr.sin_port));
+
+  printf("sleeping for 5 seconds\n");
+  sleep(5);
+  
+  printf("calling for return packet\n");
+  addr_len = sizeof(struct sockaddr_in);
+  if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN - 1, 0, 
+			   (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+    perror("recvfrom");
+    exit(1);
+  }
+
+  printf("got packet from %s, port %d\n",
+	 inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
+  printf("packet is %d bytes long\n", numbytes);
+  buf[numbytes] = '\0';
+  printf("packet contains \"%s\"\n", buf);
+
+  close(sockfd);
+  return 0;
+}
