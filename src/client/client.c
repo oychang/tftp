@@ -45,27 +45,28 @@ int tftp_client(int port, int vflag, int rflag,
       perror("opening local file for writing");
       exit(1);
     }
-    strncat(sendbuf, OPCODE_RRQ, 2);
-    bufferPos = 2;
+    memcpy(sendbuf, (char [2]){0, 1}, 2*sizeof(char));
+    // strncat(sendbuf, OPCODE_RRQ, 2);
+    bufferPos += 2;
   } else {
     if ((ioFile = fopen(file_name, "r")) == NULL) {
       perror("opening local file for reading");
       exit(1);
     }
-    strncat(sendbuf, OPCODE_WRQ, 2);
-    bufferPos = 2;
+    memcpy(sendbuf, (char [2]){0, 2}, 2*sizeof(char));
+    // strncat(sendbuf, OPCODE_WRQ, 2);
+    bufferPos += 2;
   }
 
   // Add the target file name into the buffer
-  strcat(sendbuf, file_name);
+  strcpy(&sendbuf[bufferPos], file_name);
   bufferPos += strlen(file_name);
-
-  // Place 1 byte containing zero, the mode, then another byte of zero
-  sendbuf[bufferPos] = '0';
+  sendbuf[bufferPos] = '\0';
   bufferPos++;
-  strcat(sendbuf, mode);
+
+  strcpy(&sendbuf[bufferPos], mode);
   bufferPos += strlen(mode);
-  sendbuf[bufferPos] = '0';
+  sendbuf[bufferPos] = '\0';
   bufferPos++;
 
   /* printf("The packet so far: ");
