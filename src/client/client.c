@@ -21,7 +21,6 @@ int tftp_client(int port, int vflag, int rflag,
   int block_number;
   char temp_blno[2];
   FILE *ioFile;
-  char *sentinel;
   char fileLine[MAXDATALEN];
 
   if ((he = gethostbyname(host_name)) == NULL) {
@@ -72,11 +71,11 @@ int tftp_client(int port, int vflag, int rflag,
   sendbuf[bufferPos] = '0';
   bufferPos++;
 
-  printf("The packet so far: ");
+  /* printf("The packet so far: ");
   for (index = 0; index < bufferPos; index++) {
     printf("%c", sendbuf[index]);
   }
-  printf("\n");
+  printf("\n"); */
 
   if ((numbytes = sendto(sockfd, sendbuf, bufferPos, 0,
 			 (struct sockaddr *)&their_addr,
@@ -84,12 +83,12 @@ int tftp_client(int port, int vflag, int rflag,
     perror("sendto");
     exit(1);
   }
-  printf("Send %d bytes to %s\n", numbytes,
+  log("Send %d bytes to %s\n", numbytes,
 	 inet_ntoa(their_addr.sin_addr));
 
   addr_len = sizeof(struct sockaddr_in);
   getsockname(sockfd, (struct sockaddr *)&my_addr, &addr_len);
-  printf("Sent from port %d\n", ntohs(my_addr.sin_port));
+  log("Sent from port %d\n", ntohs(my_addr.sin_port));
 
   //  printf("Sleeping for 5 seconds\n");
   //  sleep(5);
@@ -97,30 +96,30 @@ int tftp_client(int port, int vflag, int rflag,
   if (rflag) {
     block_number = 1;
     while (loopcond) {
-      printf("Calling for return packet\n");
+      log("Calling for return packet\n");
       addr_len = sizeof(struct sockaddr_in);
       if ((numbytes = recvfrom(sockfd, recvbuf, MAXBUFLEN - 1, 0,
 	  (struct sockaddr *)&their_addr, &addr_len)) == -1) {
 	perror("recvfrom");
         exit(1);
       }
-      printf("Got packet from %s, port %d\n",
+      log("Got packet from %s, port %d\n",
              inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
-      printf("Packet is %d bytes long\n", numbytes);
+      log("Packet is %d bytes long\n", numbytes);
       recvbuf[numbytes] = '\0';
-      printf("Packet contains \"%s\"\n", recvbuf);
+      log("Packet contains \"%s\"\n", recvbuf);
       if (numbytes < 516) {
 	loopcond = 0;
       }
       if (recvbuf[0] == 0 && recvbuf[1] == 3) {
         strncpy(temp_blno, &recvbuf[2], 2);
 	if (atoi(temp_blno) == block_number) {
-          printf("New received data:\n%s\n", &recvbuf[4]);
+          log("New received data:\n%s\n", &recvbuf[4]);
 	  // Have to put the new received data into local file
 	  if(fputs(&recvbuf[4], ioFile) != EOF) {
-            printf("Successfully wrote 512 bytes to file\n");
+            log("Successfully wrote 512 bytes to file\n");
           } else {
-            perror("write to local file");
+            log("write to local file");
             exit(1);
           }
           // Construct an acknowledgement packet and send back
@@ -135,7 +134,7 @@ int tftp_client(int port, int vflag, int rflag,
             perror("sendto");
             exit(1);
 	  }
-	  printf("Send %d bytes to %s\n", numbytes,
+	  log("Send %d bytes to %s\n", numbytes,
 	    inet_ntoa(their_addr.sin_addr));
           block_number++;
         }
@@ -144,22 +143,22 @@ int tftp_client(int port, int vflag, int rflag,
   } else if (wflag) {
     block_number = 0;
     while (loopcond) {
-      printf("Calling for return packet\n");
+      log("Calling for return packet\n");
       addr_len = sizeof(struct sockaddr_in);
       if ((numbytes = recvfrom(sockfd, recvbuf, MAXBUFLEN - 1, 0,
         (struct sockaddr *)&their_addr, &addr_len)) == -1) {
         perror("recvfrom");
         exit(1);
       }
-      printf("Got packet from %s, port %d\n",
+      log("Got packet from %s, port %d\n",
               inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
-      printf("Packet is %d bytes long\n", numbytes);
+      log("Packet is %d bytes long\n", numbytes);
       recvbuf[numbytes] = '\0';
-      printf("Packet contains \"%s\"\n", recvbuf);
+      log("Packet contains \"%s\"\n", recvbuf);
       if (strncmp(recvbuf, OPCODE_ACK, 2) == 0) {
         if (recvbuf[2] == (char)(block_number / 10 + 48) &&
             recvbuf[3] == (char)(block_number % 10 + 48)) {
-          printf("New received ack\n");
+          log("New received ack\n");
           block_number++;
           sendbuf[0] = '\0';
           strcat(sendbuf, OPCODE_DAT);
@@ -188,7 +187,7 @@ int tftp_client(int port, int vflag, int rflag,
 	    perror("sendto");
 	    exit(1);
 	  }
-          printf("send %d bytes to %s\n", numbytes,
+          log("send %d bytes to %s\n", numbytes,
 	    inet_ntoa(their_addr.sin_addr));
           if (numbytes < 516) {
             loopcond = 0;
