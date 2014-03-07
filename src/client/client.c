@@ -167,7 +167,6 @@ int tftp_client(int port, int vflag, int rflag,
 	  bufferPos = 4;
 	  // Add the data to the packet!
           if (fgets(fileLine, MAXDATALEN, ioFile) != NULL) {
-	    sentinel = fgets(fileLine, MAXDATALEN, ioFile);
 	    fileLine[strlen(fileLine) -1] = '\0';
 	    bufferPos += strlen(fileLine);
             strcat(sendbuf, fileLine);
