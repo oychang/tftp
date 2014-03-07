@@ -14,12 +14,12 @@ int tftp_client(int port, int vflag, int rflag,
   char mode[MAXMODELEN] = "octet";
   int numbytes;
   int wflag = (rflag ? 0 : 1);
-  int index;
-  int argument;
+  //  int index;
+  //  int argument;
   int bufferPos;
   int loopcond = 1;
   int block_number;
-  char temp_blno[2];
+  //  char temp_blno[2];
   FILE *ioFile;
   char fileLine[MAXDATALEN];
 
@@ -106,27 +106,28 @@ int tftp_client(int port, int vflag, int rflag,
       log("Packet is %d bytes long\n", numbytes);
       recvbuf[numbytes] = '\0';
       log("Packet contains \"%s\"\n", recvbuf);
-      if (numbytes < 516) {
+      if (numbytes < MAXBUFLEN) {
 	loopcond = 0;
       }
       if (recvbuf[0] == 0 && recvbuf[1] == 3) {
-        strncpy(temp_blno, &recvbuf[2], 2);
-	if (atoi(temp_blno) == block_number) {
-          log("New received data:\n%s\n", &recvbuf[4]);
+        if ((recvbuf[2] == block_number / 10) &&
+	    (recvbuf[3] == block_number % 10)) {
+          log("New received data: %s\n", &recvbuf[4]);
 	  // Have to put the new received data into local file
 	  if(fputs(&recvbuf[4], ioFile) != EOF) {
-            log("Successfully wrote 512 bytes to file\n");
+            log("Successfully wrote new data to file\n");
           } else {
             log("write to local file");
             exit(1);
           }
           // Construct an acknowledgement packet and send back
           sendbuf[0] = '\0';
-          strcat(sendbuf, OPCODE_ACK);
+          memcpy(sendbuf, (char [2]){0, 4}, 2*sizeof(char));
+          //strcat(sendbuf, OPCODE_ACK);
           sendbuf[2] = (char)(block_number / 10 + 48);
           sendbuf[3] = (char)(block_number % 10 + 48);
           sendbuf[4] = '\0';
-	  if ((numbytes = sendto(sockfd, sendbuf, 4, 0,
+	  if ((numbytes = sendto(sockfd, sendbuf, strlen(sendbuf), 0,
 	      (struct sockaddr *)&their_addr,
               sizeof(struct sockaddr))) == -1) {
             perror("sendto");
@@ -134,6 +135,9 @@ int tftp_client(int port, int vflag, int rflag,
 	  }
 	  log("Send %d bytes to %s\n", numbytes,
 	    inet_ntoa(their_addr.sin_addr));
+	  addr_len = sizeof(struct sockaddr_in);
+	  getsockname(sockfd, (struct sockaddr *)&my_addr, &addr_len);
+	  log("Sent from port %d\n", ntohs(my_addr.sin_port));
           block_number++;
         }
       }
