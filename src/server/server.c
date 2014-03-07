@@ -26,10 +26,14 @@ void
 send_packet(int sockfd, struct sockaddr_in * fromaddr,
     struct session_t * session)
 {
-    ssize_t sent_bytes = sendto(sockfd, session->sendbuf,
-        session->sendbytes, 0,
-        (struct sockaddr *)&fromaddr, sizeof(struct sockaddr));
-    log("send %ld bytes\n", sent_bytes);
+    log("====================\n");
+    log("about to send %ld bytes\n", session->sendbytes);
+
+    ssize_t sent_bytes = sendto(sockfd, session->sendbuf, session->sendbytes,
+        0, (struct sockaddr *)fromaddr, sizeof(struct sockaddr));
+
+    log("actually sent %ld bytes\n", sent_bytes);
+    log("====================\n");
 
     return;
 }
@@ -62,11 +66,12 @@ tftp_server(const int port, const int is_verbose)
     // from the same client)
     log("entering main program loop\n");
     while (true) {
-        log("waiting for udp packet\n");
         session.recvbytes = packet_listener(sockfd, session.recvbuf, &fromaddr);
 
         // Parse packet and prepare response
-        switch (parse_packet(&session)) {
+        int parser_ret = parse_packet(&session);
+        log("got %d as result of parsing\n", parser_ret);
+        switch (parser_ret) {
         case RRQ: case WRQ: case DATA: case ACK:
             // Get a TID if this is a response to a request
             if (client_tid == -1) {
@@ -82,7 +87,10 @@ tftp_server(const int port, const int is_verbose)
         case ERROR: case 0:
             log("sending packet and then resetting connection\n");
             send_packet(transfer_sockfd, &fromaddr, &session);
+
             client_tid = -1;
+            reset_session(&session);
+
             close(transfer_sockfd);
             transfer_sockfd = get_bound_sockfd(0, &transfer_addr);
             break;
@@ -411,8 +419,10 @@ reset_session(struct session_t * session)
     session->status = IDLE;
     session->fn[0] = '\0';
     session->block_n = 0;
-    if (session->file)
+    if (session->file != NULL) {
         fclose(session->file);
+        session->file = NULL;
+    }
 
     return;
 }
