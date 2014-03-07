@@ -49,7 +49,6 @@ enum opcode {RRQ = 1, WRQ = 2, DATA = 3, ACK = 4, ERROR = 5};
 // };
 struct session_t {
     enum {IDLE, RECV, SEND} status;
-    unsigned int            tid[2];
     unsigned int            block_n;
     string                  fn;
     FILE *                  file;
@@ -63,7 +62,7 @@ struct session_t {
 // Main jumping off point for operation.
 // port: port to listen on for read/write requests
 // is_verbose: true/false flag that indicates whether or not to log
-int tftp_server(int port, int is_verbose);
+int tftp_server(const int port, const int is_verbose);
 
 // Returns: new, ready-to-use socket file descriptor
 int get_udp_sockfd(void);
@@ -86,6 +85,12 @@ ssize_t packet_listener(int sockfd, buffer buf, struct sockaddr_in * fromaddr);
 // error: send ready error, reset connection information
 //  else: enum opcode for type of packet to send
 int parse_packet(struct session_t * session);
+int parse_request_packet(struct session_t * session, int is_read);
+int parse_data_packet(struct session_t * session);
+int parse_ack_packet(struct session_t * session);
+int parse_error_packet(struct session_t * session);
+void reset_session(struct session_t * session);
+
 // These all build up their respective packets, setting sendbuf & sendbytes.
 // prepare_error_packet() expects an errcode 0--7 and a valid C string.
 void prepare_error_packet(struct session_t * session,

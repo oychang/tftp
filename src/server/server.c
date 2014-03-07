@@ -44,7 +44,7 @@ parse_request_packet(struct session_t * session, int is_read)
 
     // So we can access the file!
     // Now, open a file descriptor to it
-    log("fopening file '%s' mode '%s'", session->fn, is_read ? "r" : "w");
+    log("fopening file '%s' mode '%s'\n", session->fn, is_read ? "r" : "w");
     session->file = fopen(session->fn, is_read ? "r" : "w");
 
     // Check mode equal to octet
@@ -135,8 +135,6 @@ reset_session(struct session_t * session)
     session->status = IDLE;
     session->fn[0] = '\0';
     session->block_n = 0;
-    session->tid[0] = -1;
-    session->tid[1] = -1;
     if (session->file)
         fclose(session->file);
 
@@ -156,30 +154,36 @@ parse_error_packet(struct session_t * session)
     return -1;
 }
 
-// void
-// send_packet(int sockfd, buffer sendbuf, struct sockaddr_in fromaddr,
-//     struct session_t * session)
-// {
-//     ssize_t sent_bytes = sendto(sockfd, sendbuf,
-//         session->sendbytes, 0, fromaddr);
+void
+send_packet(int sockfd, struct sockaddr_in * fromaddr,
+    struct session_t * session)
+{
+    ssize_t sent_bytes = sendto(sockfd, session->sendbuf,
+        session->sendbytes, 0,
+        (struct sockaddr *)&fromaddr, sizeof(struct sockaddr));
+    log("send %ld bytes\n", sent_bytes);
 
-//     return;
-// }
+    return;
+}
 //=============================================================================
 int
-tftp_server(int port, int is_verbose)
+tftp_server(const int port, const int is_verbose)
 {
     // must reset or else value is lost
+    // XXX: there's got to be a better way of handling globals than this
     VERBOSE = is_verbose;
 
-    // get a socket file descriptor
+    // Setup listening on our pseudo well-known port.
+    // In addition, just reuse this socket for transfers instead of juggling
+    // two different ones.
+    // XXX: for multiple clients, I imagine select() + multiple sockfds
     const int sockfd = get_udp_sockfd();
+    struct sockaddr_in myaddr;
     if (sockfd == EXIT_FAILURE)
         return EXIT_FAILURE;
-    set_socket_options(sockfd);
-
+    else
+        set_socket_options(sockfd);
     // get network information about myself and then bind
-    struct sockaddr_in myaddr;
     setup_my_sin(&myaddr, port);
     if (bind(sockfd, (struct sockaddr *)&myaddr, sizeof(struct sockaddr))
         == -1) {
@@ -191,24 +195,46 @@ tftp_server(int port, int is_verbose)
     }
 
     log("entering main program loop\n");
+    int client_tid = -1;
     struct sockaddr_in fromaddr;
-    // buffer recvbuf;
-    // buffer sendbuf;
     struct session_t session;
     session.status = IDLE;
+
+    // In this loop, we have to make sure that TIDs get sorted out.
+    // Cases:
+    // (1) if session is idle, listen on our "well-known port" (default
+    // & occurs on reset of session)
+    // (2) if session is active, listen on the ephemeral session port for
+    // a singular TID (i.e. only respond to things on one port, ostensibly
+    // from the same client)
     while (true) {
-        // Listen for udp packet
         log("waiting for udp packet\n");
         session.recvbytes = packet_listener(sockfd, session.recvbuf, &fromaddr);
 
         // Parse packet and prepare response
         switch (parse_packet(&session)) {
         case RRQ: case WRQ: case DATA: case ACK:
+            if (client_tid == -1) {
+                log("obtaining ephemeral port\n");
+                setup_my_sin(&myaddr, 0);
+                // XXX: assume success
+                bind(sockfd, (struct sockaddr *)&myaddr, sizeof(struct sockaddr));
+                client_tid = ntohs(myaddr.sin_port);
+                log("listening on %d for packets from %d\n",
+                    client_tid, ntohs(myaddr.sin_port));
+            }
+
+            log("sending packet\n");
             // send_packet(sockfd, &fromaddr, &session);
             break;
         case ERROR: case 0:
+            log("sending packet and then resetting connection\n");
             // send_packet();
-            // reset_session();
+            client_tid = -1;
+            setup_my_sin(&myaddr, port);
+            // XXX: assume success
+            bind(sockfd, (struct sockaddr *)&myaddr, sizeof(struct sockaddr));
+            reset_session(&session);
             break;
         default: case -1:
             log("ignoring this packet\n");
