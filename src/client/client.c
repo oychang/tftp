@@ -47,16 +47,13 @@ int tftp_client(int port, int vflag, int rflag,
     }
     strncat(sendbuf, OPCODE_RRQ, 2);
     bufferPos = 2;
-  } else if (wflag) {
+  } else {
     if ((ioFile = fopen(file_name, "r")) == NULL) {
       perror("opening local file for reading");
       exit(1);
     }
     strncat(sendbuf, OPCODE_WRQ, 2);
     bufferPos = 2;
-  } else {
-    printf("ERROR: No r/w designation given.\n");
-    exit(1);
   }
 
   // Add the target file name into the buffer
