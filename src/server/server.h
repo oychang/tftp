@@ -26,27 +26,6 @@ typedef char buffer[MAX_BUFFER_LEN];
 typedef char string[MAX_STRING_LEN];
 //=============================================================================
 enum opcode {RRQ = 1, WRQ = 2, DATA = 3, ACK = 4, ERROR = 5};
-// union packet {
-//     struct {
-//         char opcode[2];
-//         string filename;
-//         string mode;
-//     } rq;
-//     struct {
-//         char opcode[2];
-//         char block_number[2];
-//         char data[512];
-//     } data;
-//     struct {
-//         char opcode[2];
-//         char block_number[2];
-//     } ack;
-//     struct {
-//         char opcode[2];
-//         char errorcode[2];
-//         string errmsg;
-//     } error;
-// };
 struct session_t {
     enum {IDLE, RECV, SEND} status;
     unsigned int            block_n;
@@ -97,5 +76,8 @@ void prepare_error_packet(struct session_t * session,
     char errcode, char * errmsg);
 void prepare_ack_packet(struct session_t * session);
 void prepare_data_packet(struct session_t * session);
+
+void send_packet(int sockfd, struct sockaddr_in * fromaddr,
+    struct session_t * session);
 //=============================================================================
 #endif
