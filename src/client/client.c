@@ -64,11 +64,11 @@ int tftp_client(int port, int vflag, int rflag,
   bufferPos += strlen(file_name);
 
   // Place 1 byte containing zero, the mode, then another byte of zero
-  sendbuf[bufferPos] = '0';
+  sendbuf[bufferPos] = '\0';
   bufferPos++;
   strcat(sendbuf, mode);
   bufferPos += strlen(mode);
-  sendbuf[bufferPos] = '0';
+  sendbuf[bufferPos] = '\0';
   bufferPos++;
 
   /* printf("The packet so far: ");
