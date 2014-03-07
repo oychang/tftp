@@ -7,7 +7,6 @@ get_bound_sockfd(const int port, struct sockaddr_in * sin)
     int sockfd = get_udp_sockfd();
     if (sockfd == EXIT_FAILURE)
         return EXIT_FAILURE;
-    log("got sockfd %d\n", sockfd);
 
     set_socket_options(sockfd);
     setup_my_sin(sin, port);
@@ -16,7 +15,7 @@ get_bound_sockfd(const int port, struct sockaddr_in * sin)
         perror("bind");
         return EXIT_FAILURE;
     } else {
-        log("bind successful\n");
+        log("bind successful\n\n");
     }
 
     return sockfd;
@@ -26,14 +25,23 @@ void
 send_packet(int sockfd, struct sockaddr_in * fromaddr,
     struct session_t * session)
 {
-    log("====================\n");
-    log("about to send %ld bytes\n", session->sendbytes);
+    log("======================\n");
+    log("about to send %ld bytes to sockfd %d\n", session->sendbytes, sockfd);
+
+    if (VERBOSE) {
+        int i;
+        printf("send_packet: ");
+        for (i = 0; i < session->sendbytes; i++) {
+            printf("%d|", session->sendbuf[i]);
+        }
+        printf("\n");
+    }
 
     ssize_t sent_bytes = sendto(sockfd, session->sendbuf, session->sendbytes,
         0, (struct sockaddr *)fromaddr, sizeof(struct sockaddr));
 
     log("actually sent %ld bytes\n", sent_bytes);
-    log("====================\n");
+    log("======================\n");
 
     return;
 }
@@ -138,7 +146,6 @@ set_socket_options(int sockfd)
         .tv_sec = TIMEOUT_SEC, .tv_usec = 0
     };
 
-    log("attempting to set port reuse\n");
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int))
         == -1) {
         perror("setsockopt");
@@ -147,20 +154,19 @@ set_socket_options(int sockfd)
         log("successfully set port reuse\n");
     }
 
-    log("attempting to set timeout to %d seconds\n", TIMEOUT_SEC);
     if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO,
         (char*)&timeout, sizeof(struct timeval)) == -1) {
         perror("setsockopt");
         log("continuing without receive timeout\n");
     } else {
-        log("successfully set receive timeout\n");
+        log("successfully set receive timeout to %d seconds\n", TIMEOUT_SEC);
     }
     if (setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO,
         (char*)&timeout, sizeof(struct timeval)) == -1) {
         perror("setsockopt");
         log("continuing without send timeout\n");
     } else {
-        log("successfully set send timeout\n");
+        log("successfully set send timeout to %d seconds\n", TIMEOUT_SEC);
     }
 
     return;
@@ -170,7 +176,7 @@ void
 setup_my_sin(struct sockaddr_in * sin, int port)
 {
     sin->sin_family = AF_INET;
-    log("setting listen port to %d\n", port);
+    log("setting port to %d\n", port);
     sin->sin_port = htons(port);
     sin->sin_addr.s_addr = INADDR_ANY;
     memset(&(sin->sin_zero), '\0', 8);
