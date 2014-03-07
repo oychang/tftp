@@ -1,25 +1,8 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include "Logging.h"
+#include "client.h"
 
-#define MYPORT 3333 // Change to 3335 for real implementation
-#define MAXBUFLEN 516
-#define MAXDATALEN 512
-#define MAXMODELEN 8
-#define OPCODE_RRQ "01"
-#define OPCODE_WRQ "02"
-#define OPCODE_DAT "03"
-#define OPCODE_ACK "04"
-
-int main(int argc, char *argv[]) {
+int tftp_client(int port, int vflag, int rflag,
+  char *file_name, char *host_name) {
+  VERBOSE = vflag;
 
   int sockfd;
   struct sockaddr_in their_addr;
@@ -30,12 +13,7 @@ int main(int argc, char *argv[]) {
   char recvbuf[MAXBUFLEN];
   char mode[MAXMODELEN] = "octet";
   int numbytes;
-  int vflag = 0;
-  int rflag = 0;
-  int wflag = 0;
-  char *pvalue = NULL;
-  char *file_name = NULL;
-  char *host_name = NULL;
+  int wflag = (rflag ? 0 : 1);
   int index;
   int argument;
   int bufferPos;
@@ -46,27 +24,6 @@ int main(int argc, char *argv[]) {
   char *sentinel;
   char fileLine[MAXDATALEN];
 
-  while ((argument = getopt(argc, argv, "vrwp:")) != -1) {
-    switch (argument) {
-      case 'v':
-        VERBOSE = 1;
-        break;
-      case 'r':
-        rflag = 1;
-        break;
-      case 'w':
-        wflag = 1;
-        break;
-      case 'p':
-        pvalue = optarg;
-        break;
-      default:
-        abort();
-    }
-  }
-  file_name = argv[optind];
-  host_name = argv[optind + 1];
-
   if ((he = gethostbyname(host_name)) == NULL) {
     perror("gethostbyname");
     exit(1);
@@ -76,11 +33,7 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
   their_addr.sin_family = AF_INET;
-  if(strcmp(argv[1], "-p") == 0) {
-    their_addr.sin_port = htons(atoi(pvalue));
-  } else {
-    their_addr.sin_port = htons(MYPORT);
-  }
+  their_addr.sin_port = htons(port);
   their_addr.sin_addr = *((struct in_addr *)he->h_addr);
   memset(&(their_addr.sin_zero), '\0', 8);
 
@@ -125,19 +78,19 @@ int main(int argc, char *argv[]) {
   }
   printf("\n");
 
-  if ((numbytes = sendto(sockfd, sendbuf, bufferPos, 0, 
-			 (struct sockaddr *)&their_addr, 
+  if ((numbytes = sendto(sockfd, sendbuf, bufferPos, 0,
+			 (struct sockaddr *)&their_addr,
 			 sizeof(struct sockaddr))) == -1) {
     perror("sendto");
     exit(1);
   }
-  printf("Send %d bytes to %s\n", numbytes, 
+  printf("Send %d bytes to %s\n", numbytes,
 	 inet_ntoa(their_addr.sin_addr));
 
   addr_len = sizeof(struct sockaddr_in);
   getsockname(sockfd, (struct sockaddr *)&my_addr, &addr_len);
   printf("Sent from port %d\n", ntohs(my_addr.sin_port));
-  
+
   //  printf("Sleeping for 5 seconds\n");
   //  sleep(5);
 
@@ -176,13 +129,13 @@ int main(int argc, char *argv[]) {
           sendbuf[2] = (char)(block_number / 10 + 48);
           sendbuf[3] = (char)(block_number % 10 + 48);
           sendbuf[4] = '\0';
-	  if ((numbytes = sendto(sockfd, sendbuf, 4, 0, 
+	  if ((numbytes = sendto(sockfd, sendbuf, 4, 0,
 	      (struct sockaddr *)&their_addr,
               sizeof(struct sockaddr))) == -1) {
             perror("sendto");
             exit(1);
 	  }
-	  printf("Send %d bytes to %s\n", numbytes, 
+	  printf("Send %d bytes to %s\n", numbytes,
 	    inet_ntoa(their_addr.sin_addr));
           block_number++;
         }
@@ -193,12 +146,12 @@ int main(int argc, char *argv[]) {
     while (loopcond) {
       printf("Calling for return packet\n");
       addr_len = sizeof(struct sockaddr_in);
-      if ((numbytes = recvfrom(sockfd, recvbuf, MAXBUFLEN - 1, 0, 
+      if ((numbytes = recvfrom(sockfd, recvbuf, MAXBUFLEN - 1, 0,
         (struct sockaddr *)&their_addr, &addr_len)) == -1) {
         perror("recvfrom");
         exit(1);
       }
-      printf("Got packet from %s, port %d\n", 
+      printf("Got packet from %s, port %d\n",
               inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
       printf("Packet is %d bytes long\n", numbytes);
       recvbuf[numbytes] = '\0';
@@ -229,13 +182,13 @@ int main(int argc, char *argv[]) {
           if (sentinel != NULL) {
             strcat(sendbuf, fileLine);
 	    } */
-	  if ((numbytes = sendto(sockfd, sendbuf, bufferPos, 0, 
-	      (struct sockaddr *)&their_addr, 
+	  if ((numbytes = sendto(sockfd, sendbuf, bufferPos, 0,
+	      (struct sockaddr *)&their_addr,
 	      sizeof(struct sockaddr))) == -1) {
 	    perror("sendto");
 	    exit(1);
 	  }
-          printf("send %d bytes to %s\n", numbytes, 
+          printf("send %d bytes to %s\n", numbytes,
 	    inet_ntoa(their_addr.sin_addr));
           if (numbytes < 516) {
             loopcond = 0;

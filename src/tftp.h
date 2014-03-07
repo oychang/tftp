@@ -7,6 +7,7 @@
 #include "Boolean.h"
 #include "Logging.h"
 #include "server/server.h"
+#include "client/client.h"
 
 #define DEFAULT_SERVER_PORT 3335
 #define DEFAULT_CLIENT_PORT 3335

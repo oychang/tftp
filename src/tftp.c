@@ -59,7 +59,7 @@ main(int argc, char *argv[])
             port, is_verbose, is_read, file, host);
     }
 
-    return 0; //tftp_client(port, is_verbose, is_read, file, host);
+    return tftp_client(port, is_verbose, is_read, file, host);
 }
 
 void
