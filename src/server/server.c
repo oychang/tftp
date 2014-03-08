@@ -31,10 +31,9 @@ tftp_server(const int port, const int is_verbose)
             &client_addr);
 
         // Parse packet and prepare response
-        int parser_ret;// = parse_packet(&session);
-        // log("got opcode %d to send\n", parser_ret);
+        int parser_ret;
         switch ((parser_ret = parse_packet(&session))) {
-        case RRQ: case WRQ: case DATA: case ACK:
+        case DATA: case ACK:
             // Get a TID if this is a response to a request
             if (client_tid == -1) {
                 client_tid = ntohs(client_addr.sin_port);
@@ -44,11 +43,13 @@ tftp_server(const int port, const int is_verbose)
                 current_sockfd = get_bound_sockfd(0, &ephemeral_addr);
             }
 
-            log("sending packet\n");
+            log("sending initial packet\n");
             send_packet(current_sockfd, &client_addr, &session);
 
-            if (parser_ret == DATA && session.sendbytes < 516) {
-                log("sent partial data packet...now resetting\n");
+            if ((parser_ret == DATA && session.sendbytes < 516)
+                || (parser_ret == ACK && session.block_n > 0 &&
+                    session.recvbytes < 516)) {
+                log("partial data packet...now resetting\n");
                 client_tid = -1;
                 reset_session(&session);
                 close(current_sockfd);
@@ -168,7 +169,7 @@ setup_my_sin(struct sockaddr_in * sin, int port)
 ssize_t
 packet_listener(int sockfd, buffer buf, struct sockaddr_in * fromaddr)
 {
-    log("listening for new packet\n");
+    log("listening for new packet on sockfd %d\n", sockfd);
     // XXX: We discard and do not check this value
     socklen_t fromaddr_len = sizeof(struct sockaddr);
     ssize_t recvbytes = recvfrom(sockfd, buf, MAX_BUFFER_LEN - 1, 0,
