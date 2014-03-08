@@ -12,4 +12,4 @@ client.o: client.c client.h Logging.h
 clean:
 	rm -f *.o
 test:
-	echo 'to be implemented'
+	sh test/test.sh
