@@ -427,7 +427,7 @@ parse_error_packet(struct session_t * session)
     fprintf(stderr, "Could not transfer %s; got code %d, message: '%s'\n",
         session->fn, error_code, &session->recvbuf[4]);
 
-    return -1;
+    return 0;
 }
 
 void
