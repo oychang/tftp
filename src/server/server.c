@@ -409,3 +409,31 @@ parse_error_packet(struct session_t * session)
 
     return -1;
 }
+
+void
+send_packet(int sockfd, struct sockaddr_in * fromaddr,
+    struct session_t * session)
+{
+    ssize_t sent_bytes = sendto(sockfd, session->sendbuf, session->sendbytes,
+        0, (struct sockaddr *)fromaddr, sizeof(struct sockaddr));
+
+    if (VERBOSE) {
+        log("=========================\nsend_packet: ");
+        int i;
+        for (i = 0; i < session->sendbytes; i++) {
+            printf("%d|", session->sendbuf[i]);
+        }
+        printf("\n");
+
+        struct sockaddr_in addr;
+        socklen_t socklen = sizeof(struct sockaddr);
+        getsockname(sockfd, (struct sockaddr *)&addr, &socklen);
+        log("wanted to send %ld bytes; actually sent %ld bytes\n",
+            session->sendbytes, sent_bytes);
+        log("sent from %s:%d\n",
+            inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+        log("=========================\n");
+    }
+
+    return;
+}
