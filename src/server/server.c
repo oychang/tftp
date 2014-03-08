@@ -1,50 +1,4 @@
 #include "server.h"
-
-int
-get_bound_sockfd(const int port, struct sockaddr_in * sin)
-{
-    log("getting udp socket\n");
-    int sockfd = get_udp_sockfd();
-    if (sockfd == EXIT_FAILURE)
-        return EXIT_FAILURE;
-
-    set_socket_options(sockfd);
-    setup_my_sin(sin, port);
-    if (bind(sockfd, (struct sockaddr *)sin,
-        sizeof(struct sockaddr)) == -1) {
-        perror("bind");
-        return EXIT_FAILURE;
-    } else {
-        log("bind successful\n\n");
-    }
-
-    return sockfd;
-}
-
-void
-send_packet(int sockfd, struct sockaddr_in * fromaddr,
-    struct session_t * session)
-{
-    log("======================\n");
-    log("about to send %ld bytes to sockfd %d\n", session->sendbytes, sockfd);
-
-    if (VERBOSE) {
-        int i;
-        printf("send_packet: ");
-        for (i = 0; i < session->sendbytes; i++) {
-            printf("%d|", session->sendbuf[i]);
-        }
-        printf("\n");
-    }
-
-    ssize_t sent_bytes = sendto(sockfd, session->sendbuf, session->sendbytes,
-        0, (struct sockaddr *)fromaddr, sizeof(struct sockaddr));
-
-    log("actually sent %ld bytes\n", sent_bytes);
-    log("======================\n");
-
-    return;
-}
 //=============================================================================
 int
 tftp_server(const int port, const int is_verbose)
@@ -117,24 +71,34 @@ tftp_server(const int port, const int is_verbose)
 //=============================================================================
 //=============================================================================
 int
+get_bound_sockfd(const int port, struct sockaddr_in * sin)
+{
+    int sockfd = get_udp_sockfd();
+    if (sockfd == EXIT_FAILURE)
+        return EXIT_FAILURE;
+
+    set_socket_options(sockfd);
+    setup_my_sin(sin, port);
+    if (bind(sockfd, (struct sockaddr *)sin, sizeof(struct sockaddr)) == -1) {
+        perror("bind");
+        return EXIT_FAILURE;
+    }
+
+    log("bind successful\n");
+    return sockfd;
+}
+//-----------------------------------------------------------------------------
+int
 get_udp_sockfd(void)
 {
-    struct protoent * udp_proto = getprotobyname("udp");
-    if (udp_proto == NULL) {
-        perror("getprotobyname");
-        return EXIT_FAILURE;
-    } else {
-        log("udp protocol number is %d\n", udp_proto->p_proto);
-    }
-
     int sockfd;
-    if ((sockfd = socket(AF_INET, SOCK_DGRAM, udp_proto->p_proto)) == -1) {
+    // use IP, UDP, and automatically get the UDP protocol number
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
         perror("socket");
         return EXIT_FAILURE;
-    } else {
-        log("successfully got udp sockfd %d\n", sockfd);
     }
 
+    log("successfully got udp sockfd %d\n", sockfd);
     return sockfd;
 }
 //-----------------------------------------------------------------------------
@@ -153,7 +117,6 @@ set_socket_options(int sockfd)
     } else {
         log("successfully set port reuse\n");
     }
-
     if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO,
         (char*)&timeout, sizeof(struct timeval)) == -1) {
         perror("setsockopt");
@@ -175,8 +138,9 @@ set_socket_options(int sockfd)
 void
 setup_my_sin(struct sockaddr_in * sin, int port)
 {
-    sin->sin_family = AF_INET;
     log("setting port to %d\n", port);
+
+    sin->sin_family = AF_INET;
     sin->sin_port = htons(port);
     sin->sin_addr.s_addr = INADDR_ANY;
     memset(&(sin->sin_zero), '\0', 8);
@@ -209,7 +173,7 @@ parse_packet(struct session_t * session)
 {
     // Do a basic check for opcode validity
     if (session->recvbytes == -1) {
-        log("got no packet. probably timeout. not parsing\n");
+        log("timeout. not parsing\n");
         return -1;
     } else if (session->recvbuf[0] != 0
         || session->recvbuf[1] < 1
