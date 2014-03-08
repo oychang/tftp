@@ -6,9 +6,11 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -43,6 +45,10 @@ struct session_t {
 // is_verbose: true/false flag that indicates whether or not to log
 int tftp_server(const int port, const int is_verbose);
 
+int get_bound_sockfd(const int port, struct sockaddr_in * sin);
+void send_packet(int sockfd, struct sockaddr_in * fromaddr,
+    struct session_t * session);
+
 // Returns: new, ready-to-use socket file descriptor
 int get_udp_sockfd(void);
 
@@ -60,7 +66,6 @@ ssize_t packet_listener(int sockfd, buffer buf, struct sockaddr_in * fromaddr);
 // Parse packet and prepare response (if applicable).
 // Return Values:
 //    -1: do not send anything (either error or timeout) & do NOT reset
-//     0: send ready ack, reset connection information (i.e. transfer complete)
 // error: send ready error, reset connection information
 //  else: enum opcode for type of packet to send
 int parse_packet(struct session_t * session);
