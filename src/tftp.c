@@ -38,27 +38,27 @@ main(int argc, char *argv[])
         }
     }
 
-    if (argv[optind] != NULL)
-        file = argv[optind];
-    if (argv[optind+1] != NULL)
-        host = argv[optind + 1];
-
+    // Check and call server
     if (is_server == true) {
         port = (port == -1) ? DEFAULT_SERVER_PORT : port;
         log("args are port=%d, is_verbose=%d\n", port, is_verbose);
         return tftp_server(port, is_verbose);
     }
 
-    port = (port == -1) ? DEFAULT_CLIENT_PORT : port;
+    // Get keyword arguments, check and call client
+    if (argv[optind] != NULL)
+        file = argv[optind];
+    if (argv[optind+1] != NULL)
+        host = argv[optind + 1];
     if (file == NULL || host == NULL) {
         fprintf(stderr, "must specifiy a file and host\n");
         print_usage();
         return EXIT_FAILURE;
-    } else {
-        log("args are port=%d, is_verbose=%d, is_read=%d, file=%s, host=%s\n",
-            port, is_verbose, is_read, file, host);
     }
 
+    port = (port == -1) ? DEFAULT_CLIENT_PORT : port;
+    log("args are port=%d, is_verbose=%d, is_read=%d, file=%s, host=%s\n",
+        port, is_verbose, is_read, file, host);
     return tftp_client(port, is_verbose, is_read, file, host);
 }
 
