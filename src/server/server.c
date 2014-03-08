@@ -391,8 +391,8 @@ parse_ack_packet(struct session_t * session)
     log("parsing ack packet\n");
 
     // Get block number
-    size_t block_number = (session->recvbuf[2] << 8) + session->recvbuf[3];
-    log("got block number %zu\n", block_number);
+    unsigned int block_number = (session->recvbuf[2]<<8) + session->recvbuf[3];
+    log("got block number %u\n", block_number);
 
     if (block_number != session->block_n)
         return -1;
@@ -424,8 +424,8 @@ parse_error_packet(struct session_t * session)
     log("parsing error packet\n");
 
     // Get error code & message
-    int error_code = (session->recvbuf[2] << 8) + session->recvbuf[3];
-    fprintf(stderr, "Could not transfer %s; got code %d, message: '%s'\n",
+    unsigned int error_code = (session->recvbuf[2]<<8) + session->recvbuf[3];
+    fprintf(stderr, "Could not transfer %s; got code %u, message: '%s'\n",
         session->fn, error_code, &session->recvbuf[4]);
 
     return 0;
