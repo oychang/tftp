@@ -266,6 +266,7 @@ prepare_data_packet(struct session_t * session)
     // Read data from disk
     int bytes_read = fread(&session->sendbuf[4],
         sizeof(char), 512, session->file);
+    log("read %d byte(s)\n", bytes_read);
     session->sendbytes = 2 + 2 + bytes_read;
 
     return;
@@ -288,7 +289,7 @@ parse_request_packet(struct session_t * session, int is_read)
     }
 
     // Set staus
-    session->status = (is_read ? RRQ : WRQ);
+    session->status = (is_read ? SEND : RECV);
     log("parsing %s packet\n", is_read ? "RRQ" : "WRQ");
 
     // Set filename field
