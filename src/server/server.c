@@ -314,11 +314,6 @@ parse_request_packet(struct session_t * session, int is_read)
         }
     }
 
-    // So we can access the file!
-    // Now, open a file descriptor to it
-    log("fopening file '%s' mode '%s'\n", session->fn, is_read ? "r" : "w");
-    session->file = fopen(session->fn, is_read ? "r" : "w");
-
     // Check mode equal to octet
     const size_t filename_len = strlen(session->fn); // get for offset
     static const char * octet = "octet";
@@ -328,6 +323,13 @@ parse_request_packet(struct session_t * session, int is_read)
         prepare_error_packet(session, 0, "only octet supported");
         return ERROR;
     }
+
+    // So we can access the file!
+    // Now, open a file descriptor to it
+    if (!is_read)
+        strcat(session->fn, ".tftp");
+    log("opening file '%s' mode '%s'\n", session->fn, is_read ? "r" : "w");
+    session->file = fopen(session->fn, is_read ? "r" : "w");
 
     // Set initial block number
     if (is_read) {
