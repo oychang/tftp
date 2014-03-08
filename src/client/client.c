@@ -39,7 +39,6 @@ int tftp_client(int port, int vflag, int rflag,
   // Pack and send the initial read/write request; establish connection
   // if rflag is set, opcode 01; if wflag is set, opcode 02
   bufferPos = 0;
-  sendbuf[bufferPos] = '\0'; // Clear buffer by placing '\0' at index 0
   if (rflag) {
     if ((ioFile = fopen(file_name, "w")) == NULL) {
       perror("opening local file for writing");
