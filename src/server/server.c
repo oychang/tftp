@@ -8,17 +8,16 @@ tftp_server(const int port, const int is_verbose)
     VERBOSE = is_verbose;
 
     // Setup listening on our pseudo well-known port.
-    // XXX: for multiple clients, I imagine select() + multiple sockfds
-    struct sockaddr_in myaddr;
-    const int sockfd = get_bound_sockfd(port, &myaddr);
-    struct sockaddr_in transfer_addr;
-    int transfer_sockfd = -1;
+    struct sockaddr_in well_known_addr;
+    const int well_known_sockfd = get_bound_sockfd(port, &well_known_addr);
+    struct sockaddr_in ephemeral_addr;
+    int current_sockfd = well_known_sockfd;
+    // Information about client
+    struct sockaddr_in client_addr;
+    int client_tid = -1; // simply a port
 
-    int client_tid = -1;
-    struct sockaddr_in fromaddr;
     struct session_t session;
     session.status = IDLE;
-
     // In this loop, we have to make sure that TIDs get sorted out.
     // Cases:
     // (1) if session is idle, listen on our "well-known port" (default
@@ -28,33 +27,51 @@ tftp_server(const int port, const int is_verbose)
     // from the same client)
     log("entering main program loop\n");
     while (true) {
-        session.recvbytes = packet_listener(sockfd, session.recvbuf, &fromaddr);
+        session.recvbytes = packet_listener(current_sockfd, session.recvbuf,
+            &client_addr);
 
         // Parse packet and prepare response
-        int parser_ret = parse_packet(&session);
-        log("got %d as result of parsing\n", parser_ret);
-        switch (parser_ret) {
+        int parser_ret;// = parse_packet(&session);
+        // log("got opcode %d to send\n", parser_ret);
+        switch ((parser_ret = parse_packet(&session))) {
         case RRQ: case WRQ: case DATA: case ACK:
             // Get a TID if this is a response to a request
             if (client_tid == -1) {
-                log("obtaining ephemeral port\n");
-                transfer_sockfd = get_bound_sockfd(0, &transfer_addr);
-                client_tid = ntohs(fromaddr.sin_port);
+                client_tid = ntohs(client_addr.sin_port);
                 log("listening for packets from %d\n", client_tid);
+
+                log("obtaining ephemeral port\n");
+                current_sockfd = get_bound_sockfd(0, &ephemeral_addr);
             }
 
             log("sending packet\n");
-            send_packet(transfer_sockfd, &fromaddr, &session);
+            send_packet(current_sockfd, &client_addr, &session);
+
+            if (parser_ret == DATA && session.sendbytes < 516) {
+                log("sent partial data packet...now resetting\n");
+                client_tid = -1;
+                reset_session(&session);
+                close(current_sockfd);
+                current_sockfd = well_known_sockfd;
+            }
+
             break;
-        case ERROR: case 0:
+        case ERROR:
             log("sending packet and then resetting connection\n");
-            send_packet(transfer_sockfd, &fromaddr, &session);
+            send_packet(current_sockfd, &client_addr, &session);
 
             client_tid = -1;
             reset_session(&session);
+            close(current_sockfd);
+            current_sockfd = well_known_sockfd;
+            break;
+        case 0:
+            log("resetting connection\n");
 
-            close(transfer_sockfd);
-            transfer_sockfd = get_bound_sockfd(0, &transfer_addr);
+            client_tid = -1;
+            reset_session(&session);
+            close(current_sockfd);
+            current_sockfd = well_known_sockfd;
             break;
         default: case -1:
             log("ignoring this packet\n");
@@ -65,7 +82,7 @@ tftp_server(const int port, const int is_verbose)
     // This code will never be called since the loop above is infinite.
     // The kernel will handle closing the sockfd itself.
     log("closing down\n");
-    close(sockfd);
+    close(current_sockfd);
     return EXIT_SUCCESS;
 }
 //=============================================================================
