@@ -60,19 +60,15 @@ void send_packet(int sockfd, struct sockaddr_in * fromaddr,
 // the session struct by looking at what response needs to be sent
 // and creating it in the sendbuf.
 
-// TODO: document
-// TODO: timeouts & infinity loop removal on macro & refactor & check tid & int types
 // Parse received packet and prepare response (if applicable).
-// Return Values:
-//    -1: do not send anything (either error or timeout) & do NOT reset
-// error: send ready error, reset connection information
-//  else: enum opcode for type of packet to send
+// These will return with the type of action that the server should take
+// based on the contents of the received packet. In addition,
+// the sendbuf will be filled with all applicable return data on return.
 enum response_action parse_packet(session_t * session);
 enum response_action parse_request_packet(session_t * session, int is_read);
 enum response_action parse_data_packet(session_t * session);
 enum response_action parse_ack_packet(session_t * session);
 enum response_action parse_error_packet(session_t * session);
-void reset_session(session_t * session);
 
 // These all build up their respective packets, setting sendbuf & sendbytes.
 // prepare_error_packet() expects an errcode 0--7 and a valid C string.
@@ -80,7 +76,8 @@ void prepare_error_packet(session_t * session, char errcode, char * errmsg);
 void prepare_ack_packet(session_t * session);
 void prepare_data_packet(session_t * session);
 
-void send_packet(int sockfd, struct sockaddr_in * fromaddr,
-    session_t * session);
+// Resets the contents of the session struct (mostly...does not change bufs).
+// Make sure initialized to something or else fclose will cause a segfault.
+void reset_session(session_t * session);
 //=============================================================================
 #endif

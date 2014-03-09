@@ -95,10 +95,6 @@ parse_packet(session_t * session)
     default:    return NOOP;
     }
 }
-
-
-
-
 //-----------------------------------------------------------------------------
 void
 prepare_error_packet(session_t * session, char errcode, char * errmsg)
@@ -319,13 +315,6 @@ parse_error_packet(session_t * session)
     // requires no response.
     return RESET;
 }
-
-
-
-
-
-
-
 
 int
 get_bound_sockfd(const int port, struct sockaddr_in * sin)
