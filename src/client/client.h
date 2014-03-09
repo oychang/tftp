@@ -17,10 +17,10 @@
 #define MAXBUFLEN 516
 #define MAXDATALEN 512
 #define MAXMODELEN 8
-#define OPCODE_RRQ "01"
-#define OPCODE_WRQ "02"
-#define OPCODE_DAT "03"
-#define OPCODE_ACK "04"
+#define OPCODE_RRQ 1
+#define OPCODE_WRQ 2
+#define OPCODE_DAT 3
+#define OPCODE_ACK 4
 
 int tftp_client(int, int, char *, char *);
 

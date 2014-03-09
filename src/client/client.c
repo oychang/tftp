@@ -13,7 +13,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   int numbytes;
   int wflag = (rflag ? 0 : 1);
   int rqBufferPos = 0;
-  int addBufferPos = 0;
+  int addBufferPos = 4;
   int loopcond = 1;
   int block_number;
   FILE *ioFile;
@@ -39,16 +39,14 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
       perror("opening local file for writing");
       exit(1);
     }
-    memcpy(sendbuf, (char [2]){0, 1}, 2*sizeof(char));
-    // strncat(sendbuf, OPCODE_RRQ, 2);
+    memcpy(sendbuf, (char [2]){0, OPCODE_RRQ}, 2*sizeof(char));
     rqBufferPos += 2;
   } else {
     if ((ioFile = fopen(file_name, "r")) == NULL) {
       perror("opening local file for reading");
       exit(1);
     }
-    memcpy(sendbuf, (char [2]){0, 2}, 2*sizeof(char));
-    // strncat(sendbuf, OPCODE_WRQ, 2);
+    memcpy(sendbuf, (char [2]){0, OPCODE_WRQ}, 2*sizeof(char));
     rqBufferPos += 2;
   }
 
@@ -86,7 +84,6 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 
   if (rflag) {
     block_number = 1;
-    addBufferPos = 4;
     while (loopcond) {
       log("Calling for return packet\n");
       addr_len = sizeof(struct sockaddr_in);
@@ -103,7 +100,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
       if (numbytes < MAXBUFLEN) {
 	loopcond = 0;
       }
-      if (recvbuf[0] == 0 && recvbuf[1] == 3) {
+      if (recvbuf[0] == 0 && recvbuf[1] == OPCODE_DAT) {
         if ((recvbuf[2] == block_number / 10) &&
 	    (recvbuf[3] == block_number % 10)) {
           log("New received data: %s\n", &recvbuf[4]);
@@ -148,21 +145,19 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
       log("Packet is %d bytes long\n", numbytes);
       recvbuf[numbytes] = '\0';
       log("Packet contains \"%s\"\n", recvbuf);
-      if (strncmp(recvbuf, OPCODE_ACK, 2) == 0) {
-        if (recvbuf[2] == (char)(block_number / 10 + 48) &&
-            recvbuf[3] == (char)(block_number % 10 + 48)) {
+      if (recvbuf[0] == 0 && recvbuf[1] == OPCODE_ACK) {
+        if (recvbuf[2] == block_number / 10 &&
+            recvbuf[3] == block_number % 10) {
           log("New received ack\n");
           block_number++;
           sendbuf[0] = '\0';
-          strcat(sendbuf, OPCODE_DAT);
-          sendbuf[2] = (char)(block_number / 10 + 48);
-          sendbuf[3] = (char)(block_number % 10 + 48);
-	  addBufferPos = 4;
+          memcpy(sendbuf, (char [4]){0, OPCODE_DAT, block_number / 10, 
+		block_number % 10}, 4*sizeof(char));
 	  // Add the data to the packet!
           if (fgets(fileLine, MAXDATALEN, ioFile) != NULL) {
 	    fileLine[strlen(fileLine) -1] = '\0';
 	    addBufferPos += strlen(fileLine);
-            strcat(sendbuf, fileLine);
+            strcat(&sendbuf[4], fileLine);
 	  } else {
 	    perror("reading from local file");
 	    exit(1);
@@ -181,6 +176,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	  }
           log("send %d bytes to %s\n", numbytes,
 	    inet_ntoa(their_addr.sin_addr));
+	  addBufferPos = 4; // Reset buffer position to 2(opcode) + 2(block)
           if (numbytes < 516) {
             loopcond = 0;
 	  }
