@@ -96,59 +96,6 @@ parse_packet(session_t * session)
     }
 }
 //-----------------------------------------------------------------------------
-void
-prepare_error_packet(session_t * session, char errcode, char * errmsg)
-{
-    log("preparing error packet with code 0%d and message %s\n",
-        errcode, errmsg);
-    memcpy(session->sendbuf, (char [4]){
-        0, ERROR,  // opcode
-        0, errcode // error code
-    }, 4*sizeof(char));
-    // error message (assume errmsg is null-terminated)
-    strcpy(&session->sendbuf[4], errmsg);
-    session->sendbytes = 2 + 2 + strlen(errmsg) + 1;
-    return;
-}
-//-----------------------------------------------------------------------------
-void
-prepare_ack_packet(session_t * session)
-{
-    // Separate out the high-order byte and the low-order byte
-    // byte of what is assumed to be a 16-bit number
-    char hob = session->block_n >> 8;
-    char lob = session->block_n & 0xff;
-    log("preparing ack packet for block# %u (high:%d low:%d)\n",
-        session->block_n, hob, lob);
-    memcpy(session->sendbuf, (char [4]){
-        0, ACK,  // opcode
-        hob, lob // block number
-    }, 4*sizeof(char));
-    session->sendbytes = 2 + 2;
-
-    return;
-}
-//-----------------------------------------------------------------------------
-void
-prepare_data_packet(session_t * session)
-{
-    char hob = session->block_n >> 8;
-    char lob = session->block_n & 0xff;
-    log("preparing data packet for block# %u (high:%d low:%d)\n",
-        session->block_n, hob, lob);
-    memcpy(session->sendbuf, (char [4]){
-        0, DATA, // opcode
-        hob, lob // block number
-    }, 4*sizeof(char));
-    // Read data from disk
-    int bytes_read = fread(&session->sendbuf[4],
-        sizeof(char), 512, session->file);
-    log("read %d byte(s)\n", bytes_read);
-    session->sendbytes = 2 + 2 + bytes_read;
-
-    return;
-}
-//=============================================================================
 enum response_action
 parse_request_packet(session_t * session, int is_read)
 {
@@ -165,7 +112,7 @@ parse_request_packet(session_t * session, int is_read)
         return SEND_RESET;
     }
 
-    // Set staus
+    // Set status
     session->status = (is_read ? READ : WRITE);
     log("parsing %s packet\n", is_read ? "RRQ" : "WRQ");
 
@@ -221,7 +168,7 @@ parse_request_packet(session_t * session, int is_read)
 
     return SEND;
 }
-
+//-----------------------------------------------------------------------------
 enum response_action
 parse_data_packet(session_t * session)
 {
@@ -261,8 +208,7 @@ parse_data_packet(session_t * session)
     prepare_ack_packet(session);
     return (session->recvbytes < 516) ? SEND_RESET : SEND;
 }
-
-
+//-----------------------------------------------------------------------------
 enum response_action
 parse_ack_packet(session_t * session)
 {
@@ -283,7 +229,75 @@ parse_ack_packet(session_t * session)
     prepare_data_packet(session);
     return (session->sendbytes < 516) ? SEND_RESET : SEND;
 }
+//-----------------------------------------------------------------------------
+enum response_action
+parse_error_packet(session_t * session)
+{
+    log("parsing error packet\n");
 
+    // Get error code & message
+    unsigned int error_code = (session->recvbuf[2]<<8) + session->recvbuf[3];
+    fprintf(stderr, "Could not transfer %s; got code %u, message: '%s'\n",
+        session->fn, error_code, &session->recvbuf[4]);
+
+    // Any error constitutes an immediate premature termination and
+    // requires no response.
+    return RESET;
+}
+//=============================================================================
+void
+prepare_error_packet(session_t * session, char errcode, char * errmsg)
+{
+    log("preparing error packet with code 0%d and message %s\n",
+        errcode, errmsg);
+    memcpy(session->sendbuf, (char [4]){
+        0, ERROR,  // opcode
+        0, errcode // error code
+    }, 4*sizeof(char));
+    // error message (assume errmsg is null-terminated)
+    strcpy(&session->sendbuf[4], errmsg);
+    session->sendbytes = 2 + 2 + strlen(errmsg) + 1;
+    return;
+}
+//-----------------------------------------------------------------------------
+void
+prepare_ack_packet(session_t * session)
+{
+    // Separate out the high-order byte and the low-order byte
+    // byte of what is assumed to be a 16-bit number
+    char hob = session->block_n >> 8;
+    char lob = session->block_n & 0xff;
+    log("preparing ack packet for block# %u (high:%d low:%d)\n",
+        session->block_n, hob, lob);
+    memcpy(session->sendbuf, (char [4]){
+        0, ACK,  // opcode
+        hob, lob // block number
+    }, 4*sizeof(char));
+    session->sendbytes = 2 + 2;
+
+    return;
+}
+//-----------------------------------------------------------------------------
+void
+prepare_data_packet(session_t * session)
+{
+    char hob = session->block_n >> 8;
+    char lob = session->block_n & 0xff;
+    log("preparing data packet for block# %u (high:%d low:%d)\n",
+        session->block_n, hob, lob);
+    memcpy(session->sendbuf, (char [4]){
+        0, DATA, // opcode
+        hob, lob // block number
+    }, 4*sizeof(char));
+    // Read data from disk
+    int bytes_read = fread(&session->sendbuf[4],
+        sizeof(char), 512, session->file);
+    log("read %d byte(s)\n", bytes_read);
+    session->sendbytes = 2 + 2 + bytes_read;
+
+    return;
+}
+//=============================================================================
 void
 reset_session(session_t * session)
 {
@@ -300,22 +314,7 @@ reset_session(session_t * session)
 
     return;
 }
-
-enum response_action
-parse_error_packet(session_t * session)
-{
-    log("parsing error packet\n");
-
-    // Get error code & message
-    unsigned int error_code = (session->recvbuf[2]<<8) + session->recvbuf[3];
-    fprintf(stderr, "Could not transfer %s; got code %u, message: '%s'\n",
-        session->fn, error_code, &session->recvbuf[4]);
-
-    // Any error constitutes an immediate premature termination and
-    // requires no response.
-    return RESET;
-}
-
+//=============================================================================
 int
 get_bound_sockfd(const int port, struct sockaddr_in * sin)
 {
