@@ -159,15 +159,8 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	    addBufferPos += strlen(fileLine);
             strcat(&sendbuf[4], fileLine);
 	  } else {
-	    perror("reading from local file");
-	    exit(1);
+	    log("Finished reading from local file.\n");
 	  }
-          /*sentinel = fgets(fileLine, MAXDATALEN, ioFile);
-	  fileLine[strlen(fileLine) - 1] = '\0';
-          addBufferPos += strlen(fileLine);
-          if (sentinel != NULL) {
-            strcat(sendbuf, fileLine);
-	    } */
 	  if ((numbytes = sendto(sockfd, sendbuf, addBufferPos, 0,
 	      (struct sockaddr *)&their_addr,
 	      sizeof(struct sockaddr))) == -1) {
