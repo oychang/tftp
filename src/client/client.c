@@ -12,8 +12,8 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   char mode[MAXMODELEN] = "octet";
   int numbytes;
   int wflag = (rflag ? 0 : 1);
-  //  int index;
-  //  int argument;
+  // int index;
+  // int argument;
   int bufferPos;
   int loopcond = 1;
   int block_number;
@@ -80,7 +80,6 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   }
   log("Send %d bytes to %s\n", numbytes,
 	 inet_ntoa(their_addr.sin_addr));
-
   addr_len = sizeof(struct sockaddr_in);
   getsockname(sockfd, (struct sockaddr *)&my_addr, &addr_len);
   log("Sent from port %d\n", ntohs(my_addr.sin_port));
@@ -91,7 +90,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   if (rflag) {
     block_number = 1;
     while (loopcond) {
-      log("Calling for return packet\n");
+      // log("Calling for return packet\n");
       addr_len = sizeof(struct sockaddr_in);
       if ((numbytes = recvfrom(sockfd, recvbuf, MAXBUFLEN - 1, 0,
 	  (struct sockaddr *)&their_addr, &addr_len)) == -1) {
@@ -119,12 +118,12 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
           }
           // Construct an acknowledgement packet and send back
           sendbuf[0] = '\0';
-          memcpy(sendbuf, (char [2]){0, 4}, 2*sizeof(char));
-          //strcat(sendbuf, OPCODE_ACK);
-          sendbuf[2] = (char)(block_number / 10 + 48);
-          sendbuf[3] = (char)(block_number % 10 + 48);
-          sendbuf[4] = '\0';
-	  if ((numbytes = sendto(sockfd, sendbuf, strlen(sendbuf), 0,
+          memcpy(sendbuf, (char [4]){0, 4, block_number / 10, 
+		 block_number % 10}, 4*sizeof(char));
+          //sendbuf[2] = block_number / 10 + 48;
+          //sendbuf[3] = block_number % 10 + 48;
+          bufferPos = 4;
+	  if ((numbytes = sendto(sockfd, sendbuf, bufferPos, 0,
 	      (struct sockaddr *)&their_addr,
               sizeof(struct sockaddr))) == -1) {
             perror("sendto");
@@ -142,7 +141,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   } else if (wflag) {
     block_number = 0;
     while (loopcond) {
-      log("Calling for return packet\n");
+      // log("Calling for return packet\n");
       addr_len = sizeof(struct sockaddr_in);
       if ((numbytes = recvfrom(sockfd, recvbuf, MAXBUFLEN - 1, 0,
         (struct sockaddr *)&their_addr, &addr_len)) == -1) {

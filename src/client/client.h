@@ -13,7 +13,7 @@
 #include <netdb.h>
 #include "../Logging.h"
 
-#define MYPORT 3333 // Change to 3335 for real implementation
+#define MYPORT 3335
 #define MAXBUFLEN 516
 #define MAXDATALEN 512
 #define MAXMODELEN 8
