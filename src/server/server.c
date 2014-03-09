@@ -360,14 +360,14 @@ set_socket_options(int sockfd)
         log("successfully set port reuse\n");
     }
     if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO,
-        (char*)&timeout, sizeof(struct timeval)) == -1) {
+        (void*)&timeout, sizeof(struct timeval)) == -1) {
         perror("setsockopt");
         log("continuing without receive timeout\n");
     } else {
         log("successfully set receive timeout to %d seconds\n", TIMEOUT_SEC);
     }
     if (setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO,
-        (char*)&timeout, sizeof(struct timeval)) == -1) {
+        (void*)&timeout, sizeof(struct timeval)) == -1) {
         perror("setsockopt");
         log("continuing without send timeout\n");
     } else {

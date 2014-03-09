@@ -1,6 +1,6 @@
 CC = gcc
 LD = $(CC)
-CFLAGS = -Wall -Wextra -O2 -Werror
+CFLAGS = -Wall -Wextra -O2 -Werror -std=gnu99
 VPATH = src src/server src/client
 
 
