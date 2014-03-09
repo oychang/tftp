@@ -13,16 +13,19 @@ typedef char buffer[MAX_BUFFER_LEN];
 typedef char string[MAX_STRING_LEN];
 //-----------------------------------------------------------------------------
 enum opcode {RRQ = 1, WRQ = 2, DATA = 3, ACK = 4, ERROR = 5};
+enum response_action {SEND, SEND_RESET, RESET, NOOP};
+enum session_action {IDLE, WRITE, READ};
 typedef struct {
-    enum {IDLE, RECV, SEND} status;
-    unsigned int            block_n;
-    string                  fn;
-    FILE *                  file;
+    enum session_action status;
+    unsigned int        block_n;
+    string              fn;
+    FILE *              file;
+    unsigned int        client_tid;
 
-    ssize_t                 recvbytes;
-    buffer                  recvbuf;
-    ssize_t                 sendbytes;
-    buffer                  sendbuf;
+    ssize_t             recvbytes;
+    buffer              recvbuf;
+    ssize_t             sendbytes;
+    buffer              sendbuf;
 } session_t;
 //=============================================================================
 #endif
