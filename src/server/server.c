@@ -13,8 +13,7 @@ tftp_server(const int port)
     // Information about client
     struct sockaddr_in client_addr;
     // Hold information about block numbers, buffers, and byte counts.
-    session_t          session;
-    reset_session(&session);
+    session_t          session = {IDLE, 0, "", NULL, -1, 0, {}, 0, {}};
 
     // In this loop, we have to make sure that TIDs get sorted out.
     // Cases:
@@ -29,7 +28,7 @@ tftp_server(const int port)
     while (act == SEND || act == NOOP || LOOP_FOREVER) {
         packet_listener(current_sockfd, &session, &client_addr);
         // Check for proper TID (i.e. that port matches up to what we expect)
-        if (session.status == IDLE) {
+        if (session.status == IDLE && session.recvbytes > 0) {
             log("initial connection...assigning ports\n");
             session.client_tid = ntohs(client_addr.sin_port);
             log("client sends packets from %d\n", session.client_tid);
@@ -295,13 +294,13 @@ reset_session(session_t * session)
     log("resetting transfer\n");
 
     session->status = IDLE;
-    session->fn[0] = '\0';
     session->block_n = 0;
     session->client_tid = -1;
-    // if (session->file != NULL) {
-    //     fclose(session->file);
-    //     session->file = NULL;
-    // }
+    session->fn[0] = '\0';
+    if (session->file != NULL) {
+        fclose(session->file);
+        session->file = NULL;
+    }
 
     return;
 }
