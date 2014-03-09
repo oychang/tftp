@@ -12,7 +12,7 @@ tftp_server(const int port)
     struct sockaddr_in client_addr;
     int client_tid = -1; // simply a port
 
-    struct session_t session;
+    session_t session;
     session.status = IDLE;
     // In this loop, we have to make sure that TIDs get sorted out.
     // Cases:
