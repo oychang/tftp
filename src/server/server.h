@@ -17,72 +17,71 @@
 
 #include "../Boolean.h"
 #include "../Logging.h"
+#include "Types.h"
 //=============================================================================
-#define TIMEOUT_SEC    10
-#define MAX_BUFFER_LEN 540
-#define MAX_STRING_LEN 128
-// Masks for checking if all read/write flags are set
+// if  0: will stay open for one request until termination
+// if ~0: will loop forever until sigkill -- daemon behavior
+#define LOOP_FOREVER 0
+// The amount of time a socket will block without data until it gives up
+#define TIMEOUT_SEC 10
+// Check if everyone can read (these are defined in sys/stat.h)
 #define UGOR (S_IRUSR | S_IRGRP | S_IROTH)
-// #define UGOW S_IWUSR | S_IWGRP | S_IWOTH
-typedef char buffer[MAX_BUFFER_LEN];
-typedef char string[MAX_STRING_LEN];
 //=============================================================================
-enum opcode {RRQ = 1, WRQ = 2, DATA = 3, ACK = 4, ERROR = 5};
-struct session_t {
-    enum {IDLE, RECV, SEND} status;
-    unsigned int            block_n;
-    string                  fn;
-    FILE *                  file;
-
-    ssize_t                 recvbytes;
-    buffer                  recvbuf;
-    ssize_t                 sendbytes;
-    buffer                  sendbuf;
-};
-//=============================================================================
-// Main jumping off point for operation.
-// port: port to listen on for read/write requests
-// is_verbose: true/false flag that indicates whether or not to log
+// ===== Main server portion
+// port: the listen port for initial requests to go to
 int tftp_server(const int port);
 
+// ===== Network interaction functions
+// Utility function that does the socket -> options -> sockaddr setup -> bind
+// processes all in one step, returning the new socket file descriptor.
+// port: what port to bind to (0 => ephemeral port) & sockaddr for data
 int get_bound_sockfd(const int port, struct sockaddr_in * sin);
-void send_packet(int sockfd, struct sockaddr_in * fromaddr,
-    struct session_t * session);
-
-// Returns: new, ready-to-use socket file descriptor
+// Returns a new, ready-to-use socket file descriptor for UDP (socket() step)
 int get_udp_sockfd(void);
-
 // Sets various operations on the socket with `setsockopt`.
 // Sets port reuse, send/receive timeouts to macro TIMEOUT_SEC.
 void set_socket_options(int sockfd);
-
-// Sets up a sockaddr_in
+// Sets up a sockaddr_in to listen on the port given with IP and to any
+// network interface the device has with INADDR_ANY.
 void setup_my_sin(struct sockaddr_in * sin, int port);
 
+// Wrapper around recvfrom() setup and logging. Blocks until data or timeout.
 // Listens for up to MAX_BUFFER_LEN - 1 bytes of data.
-// Returns -1 on failure to get any data (most likely because of a timeout).
+// Returns -1 on failure or else the number of received bytes
 ssize_t packet_listener(int sockfd, buffer buf, struct sockaddr_in * fromaddr);
 
+// Sends the TFTP data held within session's sendbuf to fromaddr with my
+// sockfd. Wrapper around sendto() and accompanying logging.
+void send_packet(int sockfd, struct sockaddr_in * fromaddr,
+ session_t * session);
+
+// ===== Parsing functions
+// These functions interact with the received data and act to build up
+// the session struct by looking at what response needs to be sent
+// and creating it in the sendbuf.
+
+
+// TODO: document
 // Parse packet and prepare response (if applicable).
 // Return Values:
 //    -1: do not send anything (either error or timeout) & do NOT reset
 // error: send ready error, reset connection information
 //  else: enum opcode for type of packet to send
-int parse_packet(struct session_t * session);
-int parse_request_packet(struct session_t * session, int is_read);
-int parse_data_packet(struct session_t * session);
-int parse_ack_packet(struct session_t * session);
-int parse_error_packet(struct session_t * session);
-void reset_session(struct session_t * session);
+int parse_packet(session_t * session);
+int parse_request_packet(session_t * session, int is_read);
+int parse_data_packet(session_t * session);
+int parse_ack_packet(session_t * session);
+int parse_error_packet(session_t * session);
+void reset_session(session_t * session);
 
 // These all build up their respective packets, setting sendbuf & sendbytes.
 // prepare_error_packet() expects an errcode 0--7 and a valid C string.
-void prepare_error_packet(struct session_t * session,
+void prepare_error_packet(session_t * session,
     char errcode, char * errmsg);
-void prepare_ack_packet(struct session_t * session);
-void prepare_data_packet(struct session_t * session);
+void prepare_ack_packet(session_t * session);
+void prepare_data_packet(session_t * session);
 
 void send_packet(int sockfd, struct sockaddr_in * fromaddr,
-    struct session_t * session);
+    session_t * session);
 //=============================================================================
 #endif

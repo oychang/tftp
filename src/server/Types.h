@@ -1,5 +1,8 @@
 #ifndef TYPES_H
 #define TYPES_H
+
+#include <stdio.h>
+#include <unistd.h>
 //=============================================================================
 // Practically, the buffer should only be able to hold 2+2+512 = 516 bytes
 // since that is the maximum size of the largest packet (a full DATA).

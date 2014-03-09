@@ -83,7 +83,251 @@ tftp_server(const int port)
     return EXIT_SUCCESS;
 }
 //=============================================================================
+int
+parse_packet(session_t * session)
+{
+    // Do a basic check for opcode validity
+    if (session->recvbytes == -1) {
+        log("timeout. not parsing\n");
+        return -1;
+    } else if (session->recvbuf[0] != 0
+        || session->recvbuf[1] < 1
+        || session->recvbuf[1] > 5) {
+        log("got invalid opcode...not parsing\n");
+        return -1;
+    } else {
+        log("found opcode as 0%d\n", session->recvbuf[1]);
+    }
+
+    // These enum values are set to their opcodes, so we can switch
+    // on either one--this is easier to read.
+    switch (session->recvbuf[1]) {
+    case RRQ:
+        return parse_request_packet(session, true);
+    case WRQ:
+        return parse_request_packet(session, false);
+    case DATA:
+        return parse_data_packet(session);
+    case ACK:
+        return parse_ack_packet(session);
+    case ERROR:
+        return parse_error_packet(session);
+    default:
+        return -1;
+    }
+}
+//-----------------------------------------------------------------------------
+void
+prepare_error_packet(session_t * session, char errcode, char * errmsg)
+{
+    log("preparing error packet with code 0%d and message %s\n",
+        errcode, errmsg);
+    memcpy(session->sendbuf, (char [4]){
+        0, ERROR,  // opcode
+        0, errcode // error code
+    }, 4*sizeof(char));
+    // error message (assume errmsg is null-terminated)
+    strcpy(&session->sendbuf[4], errmsg);
+    session->sendbytes = 2 + 2 + strlen(errmsg) + 1;
+    return;
+}
+//-----------------------------------------------------------------------------
+void
+prepare_ack_packet(session_t * session)
+{
+    // Separate out the high-order byte and the low-order byte
+    // byte of what is assumed to be a 16-bit number
+    char hob = session->block_n >> 8;
+    char lob = session->block_n & 0xff;
+    log("preparing ack packet for block# %u (high:%d low:%d)\n",
+        session->block_n, hob, lob);
+    memcpy(session->sendbuf, (char [4]){
+        0, ACK,  // opcode
+        hob, lob // block number
+    }, 4*sizeof(char));
+    session->sendbytes = 2 + 2;
+
+    return;
+}
+//-----------------------------------------------------------------------------
+void
+prepare_data_packet(session_t * session)
+{
+    char hob = session->block_n >> 8;
+    char lob = session->block_n & 0xff;
+    log("preparing data packet for block# %u (high:%d low:%d)\n",
+        session->block_n, hob, lob);
+    memcpy(session->sendbuf, (char [4]){
+        0, DATA, // opcode
+        hob, lob // block number
+    }, 4*sizeof(char));
+    // Read data from disk
+    int bytes_read = fread(&session->sendbuf[4],
+        sizeof(char), 512, session->file);
+    log("read %d byte(s)\n", bytes_read);
+    session->sendbytes = 2 + 2 + bytes_read;
+
+    return;
+}
 //=============================================================================
+int
+parse_request_packet(session_t * session, int is_read)
+{
+    // Check that the packet is a good size
+    // Opcode + 1 Char filename + \0 + 1 Char mode + \0
+    static const int min_req_length = 2 + 1 + 1 + 1 + 1;
+    if (session->status != IDLE) {
+        log("transfer in progress, ignoring request\n");
+        return -1;
+    } else if (session->recvbytes < min_req_length) {
+        log("aborting: request packet too short (min length is %d)\n",
+            min_req_length);
+        prepare_error_packet(session, 0, "request too short");
+        return ERROR;
+    }
+
+    // Set staus
+    session->status = (is_read ? SEND : RECV);
+    log("parsing %s packet\n", is_read ? "RRQ" : "WRQ");
+
+    // Set filename field
+    strncpy(session->fn, &session->recvbuf[2], MAX_STRING_LEN);
+    session->fn[MAX_STRING_LEN-1] = '\0'; // ensure null-terminated
+    log("got filename as %s\n", session->fn);
+
+    // Check filename is accessible
+    // (1): only current directory allowed (no ../foo or /foo)
+    // (2): only do if accessible to everyone
+    struct stat statbuf;
+    if (strstr(session->fn, "..") != NULL) {
+        log("terminating: found up traversal\n");
+        prepare_error_packet(session, 2, "no up traversal");
+        return ERROR;
+    } else if (is_read) {
+        if (!stat(session->fn, &statbuf)
+            && (statbuf.st_mode & (UGOR)) != (UGOR)) {
+            log("terminating: file not readable by all\n");
+            prepare_error_packet(session, 2, "bad read permissions");
+            return ERROR;
+        }
+    }
+
+    // Check mode equal to octet
+    const size_t filename_len = strlen(session->fn); // get for offset
+    static const char * octet = "octet";
+    const size_t octet_len = strlen(octet);
+    if (strncasecmp(&session->recvbuf[2+filename_len+1], octet, octet_len)) {
+        log("aborting: only octet mode supported\n");
+        prepare_error_packet(session, 0, "only octet supported");
+        return ERROR;
+    }
+
+    // So we can access the file!
+    // Now, open a file descriptor to it
+    if (!is_read)
+        strcat(session->fn, ".tftp");
+    log("opening file '%s' mode '%s'\n", session->fn, is_read ? "r" : "w");
+    session->file = fopen(session->fn, is_read ? "r" : "w");
+
+    // Set initial block number
+    if (is_read) {
+        session->block_n = 1;
+        prepare_data_packet(session);
+        return DATA;
+    }
+    session->block_n = 0;
+    prepare_ack_packet(session);
+    return ACK;
+}
+
+int
+parse_data_packet(session_t * session)
+{
+    // Check that packet is a good size
+    // Opcode (2B) + Block Number (2B) + n bytes (max 512)
+    static const int min_data_len = 2 + 2 + 0; // can get 0 bytes
+    static const int max_data_len = 2 + 2 + 512;
+    if (session->status != RECV) {
+        log("no request or we are sender; can't write data packet");
+        return -1;
+    } else if (session->recvbytes > max_data_len
+        || session->recvbytes < min_data_len) {
+        log("aborting: data packet size is wrong\n");
+        prepare_error_packet(session, 0, "bad data packet size");
+        return ERROR;
+    }
+
+    // Set block number
+    log("parsing data packet\n");
+    unsigned int block_number = (session->recvbuf[2]<<8) + session->recvbuf[3];
+    log("got block number as %u\n", block_number);
+    // Check for Sorcerer's Apprentice Bug
+    // That is, check if we've already sent an ACK for the block number
+    // we just received and if so, ignore this packet.
+    if (block_number <= session->block_n) {
+        log("SAS detected\n");
+        log("Got block# %u while expecting block# %u\n",
+            block_number, session->block_n);
+        return -1;
+    } else
+        session->block_n++;
+
+    // Write data out to disk
+    log("writing out %ld bytes to %s\n", session->recvbytes - 4, session->fn);
+    fwrite(&session->recvbuf[4], sizeof(char),
+        session->recvbytes - 4, session->file);
+
+    prepare_ack_packet(session);
+    return ACK;
+}
+
+
+int
+parse_ack_packet(session_t * session)
+{
+    log("parsing ack packet\n");
+
+    // Get block number
+    unsigned int block_number = (session->recvbuf[2]<<8) + session->recvbuf[3];
+    log("got block number %u\n", block_number);
+
+    if (block_number != session->block_n)
+        return -1;
+    else
+        session->block_n++;
+
+    prepare_data_packet(session);
+    return DATA;
+}
+
+void
+reset_session(session_t * session)
+{
+    log("resetting transfer\n");
+    session->status = IDLE;
+    session->fn[0] = '\0';
+    session->block_n = 0;
+    if (session->file != NULL) {
+        fclose(session->file);
+        session->file = NULL;
+    }
+
+    return;
+}
+
+int
+parse_error_packet(session_t * session)
+{
+    log("parsing error packet\n");
+
+    // Get error code & message
+    unsigned int error_code = (session->recvbuf[2]<<8) + session->recvbuf[3];
+    fprintf(stderr, "Could not transfer %s; got code %u, message: '%s'\n",
+        session->fn, error_code, &session->recvbuf[4]);
+
+    return 0;
+}
+
 int
 get_bound_sockfd(const int port, struct sockaddr_in * sin)
 {
@@ -181,255 +425,9 @@ packet_listener(int sockfd, buffer buf, struct sockaddr_in * fromaddr)
 
     return recvbytes;
 }
-//=============================================================================
-int
-parse_packet(struct session_t * session)
-{
-    // Do a basic check for opcode validity
-    if (session->recvbytes == -1) {
-        log("timeout. not parsing\n");
-        return -1;
-    } else if (session->recvbuf[0] != 0
-        || session->recvbuf[1] < 1
-        || session->recvbuf[1] > 5) {
-        log("got invalid opcode...not parsing\n");
-        return -1;
-    } else {
-        log("found opcode as 0%d\n", session->recvbuf[1]);
-    }
-
-    // These enum values are set to their opcodes, so we can switch
-    // on either one--this is easier to read.
-    switch (session->recvbuf[1]) {
-    case RRQ:
-        return parse_request_packet(session, true);
-    case WRQ:
-        return parse_request_packet(session, false);
-    case DATA:
-        return parse_data_packet(session);
-    case ACK:
-        return parse_ack_packet(session);
-    case ERROR:
-        return parse_error_packet(session);
-    default:
-        return -1;
-    }
-}
 //-----------------------------------------------------------------------------
 void
-prepare_error_packet(struct session_t * session, char errcode, char * errmsg)
-{
-    log("preparing error packet with code 0%d and message %s\n",
-        errcode, errmsg);
-    memcpy(session->sendbuf, (char [4]){
-        0, ERROR,  // opcode
-        0, errcode // error code
-    }, 4*sizeof(char));
-    // error message (assume errmsg is null-terminated)
-    strcpy(&session->sendbuf[4], errmsg);
-    session->sendbytes = 2 + 2 + strlen(errmsg) + 1;
-    return;
-}
-//-----------------------------------------------------------------------------
-void
-prepare_ack_packet(struct session_t * session)
-{
-    // Separate out the high-order byte and the low-order byte
-    // byte of what is assumed to be a 16-bit number
-    char hob = session->block_n >> 8;
-    char lob = session->block_n & 0xff;
-    log("preparing ack packet for block# %u (high:%d low:%d)\n",
-        session->block_n, hob, lob);
-    memcpy(session->sendbuf, (char [4]){
-        0, ACK,  // opcode
-        hob, lob // block number
-    }, 4*sizeof(char));
-    session->sendbytes = 2 + 2;
-
-    return;
-}
-//-----------------------------------------------------------------------------
-void
-prepare_data_packet(struct session_t * session)
-{
-    char hob = session->block_n >> 8;
-    char lob = session->block_n & 0xff;
-    log("preparing data packet for block# %u (high:%d low:%d)\n",
-        session->block_n, hob, lob);
-    memcpy(session->sendbuf, (char [4]){
-        0, DATA, // opcode
-        hob, lob // block number
-    }, 4*sizeof(char));
-    // Read data from disk
-    int bytes_read = fread(&session->sendbuf[4],
-        sizeof(char), 512, session->file);
-    log("read %d byte(s)\n", bytes_read);
-    session->sendbytes = 2 + 2 + bytes_read;
-
-    return;
-}
-//=============================================================================
-int
-parse_request_packet(struct session_t * session, int is_read)
-{
-    // Check that the packet is a good size
-    // Opcode + 1 Char filename + \0 + 1 Char mode + \0
-    static const int min_req_length = 2 + 1 + 1 + 1 + 1;
-    if (session->status != IDLE) {
-        log("transfer in progress, ignoring request\n");
-        return -1;
-    } else if (session->recvbytes < min_req_length) {
-        log("aborting: request packet too short (min length is %d)\n",
-            min_req_length);
-        prepare_error_packet(session, 0, "request too short");
-        return ERROR;
-    }
-
-    // Set staus
-    session->status = (is_read ? SEND : RECV);
-    log("parsing %s packet\n", is_read ? "RRQ" : "WRQ");
-
-    // Set filename field
-    strncpy(session->fn, &session->recvbuf[2], MAX_STRING_LEN);
-    session->fn[MAX_STRING_LEN-1] = '\0'; // ensure null-terminated
-    log("got filename as %s\n", session->fn);
-
-    // Check filename is accessible
-    // (1): only current directory allowed (no ../foo or /foo)
-    // (2): only do if accessible to everyone
-    struct stat statbuf;
-    if (strstr(session->fn, "..") != NULL) {
-        log("terminating: found up traversal\n");
-        prepare_error_packet(session, 2, "no up traversal");
-        return ERROR;
-    } else if (is_read) {
-        if (!stat(session->fn, &statbuf)
-            && (statbuf.st_mode & (UGOR)) != (UGOR)) {
-            log("terminating: file not readable by all\n");
-            prepare_error_packet(session, 2, "bad read permissions");
-            return ERROR;
-        }
-    }
-
-    // Check mode equal to octet
-    const size_t filename_len = strlen(session->fn); // get for offset
-    static const char * octet = "octet";
-    const size_t octet_len = strlen(octet);
-    if (strncasecmp(&session->recvbuf[2+filename_len+1], octet, octet_len)) {
-        log("aborting: only octet mode supported\n");
-        prepare_error_packet(session, 0, "only octet supported");
-        return ERROR;
-    }
-
-    // So we can access the file!
-    // Now, open a file descriptor to it
-    if (!is_read)
-        strcat(session->fn, ".tftp");
-    log("opening file '%s' mode '%s'\n", session->fn, is_read ? "r" : "w");
-    session->file = fopen(session->fn, is_read ? "r" : "w");
-
-    // Set initial block number
-    if (is_read) {
-        session->block_n = 1;
-        prepare_data_packet(session);
-        return DATA;
-    }
-    session->block_n = 0;
-    prepare_ack_packet(session);
-    return ACK;
-}
-
-int
-parse_data_packet(struct session_t * session)
-{
-    // Check that packet is a good size
-    // Opcode (2B) + Block Number (2B) + n bytes (max 512)
-    static const int min_data_len = 2 + 2 + 0; // can get 0 bytes
-    static const int max_data_len = 2 + 2 + 512;
-    if (session->status != RECV) {
-        log("no request or we are sender; can't write data packet");
-        return -1;
-    } else if (session->recvbytes > max_data_len
-        || session->recvbytes < min_data_len) {
-        log("aborting: data packet size is wrong\n");
-        prepare_error_packet(session, 0, "bad data packet size");
-        return ERROR;
-    }
-
-    // Set block number
-    log("parsing data packet\n");
-    unsigned int block_number = (session->recvbuf[2]<<8) + session->recvbuf[3];
-    log("got block number as %u\n", block_number);
-    // Check for Sorcerer's Apprentice Bug
-    // That is, check if we've already sent an ACK for the block number
-    // we just received and if so, ignore this packet.
-    if (block_number <= session->block_n) {
-        log("SAS detected\n");
-        log("Got block# %u while expecting block# %u\n",
-            block_number, session->block_n);
-        return -1;
-    } else
-        session->block_n++;
-
-    // Write data out to disk
-    log("writing out %ld bytes to %s\n", session->recvbytes - 4, session->fn);
-    fwrite(&session->recvbuf[4], sizeof(char),
-        session->recvbytes - 4, session->file);
-
-    prepare_ack_packet(session);
-    return ACK;
-}
-
-
-int
-parse_ack_packet(struct session_t * session)
-{
-    log("parsing ack packet\n");
-
-    // Get block number
-    unsigned int block_number = (session->recvbuf[2]<<8) + session->recvbuf[3];
-    log("got block number %u\n", block_number);
-
-    if (block_number != session->block_n)
-        return -1;
-    else
-        session->block_n++;
-
-    prepare_data_packet(session);
-    return DATA;
-}
-
-void
-reset_session(struct session_t * session)
-{
-    log("resetting transfer\n");
-    session->status = IDLE;
-    session->fn[0] = '\0';
-    session->block_n = 0;
-    if (session->file != NULL) {
-        fclose(session->file);
-        session->file = NULL;
-    }
-
-    return;
-}
-
-int
-parse_error_packet(struct session_t * session)
-{
-    log("parsing error packet\n");
-
-    // Get error code & message
-    unsigned int error_code = (session->recvbuf[2]<<8) + session->recvbuf[3];
-    fprintf(stderr, "Could not transfer %s; got code %u, message: '%s'\n",
-        session->fn, error_code, &session->recvbuf[4]);
-
-    return 0;
-}
-
-void
-send_packet(int sockfd, struct sockaddr_in * fromaddr,
-    struct session_t * session)
+send_packet(int sockfd, struct sockaddr_in * fromaddr, session_t * session)
 {
     ssize_t sent_bytes = sendto(sockfd, session->sendbuf, session->sendbytes,
         0, (struct sockaddr *)fromaddr, sizeof(struct sockaddr));
