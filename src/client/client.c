@@ -12,12 +12,10 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   char mode[MAXMODELEN] = "octet";
   int numbytes;
   int wflag = (rflag ? 0 : 1);
-  // int index;
-  // int argument;
-  int bufferPos;
+  int rqBufferPos = 0;
+  int addBufferPos = 0;
   int loopcond = 1;
   int block_number;
-  //  char temp_blno[2];
   FILE *ioFile;
   char fileLine[MAXDATALEN];
 
@@ -36,7 +34,6 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 
   // Pack and send the initial read/write request; establish connection
   // if rflag is set, opcode 01; if wflag is set, opcode 02
-  bufferPos = 0;
   if (rflag) {
     if ((ioFile = fopen(file_name, "w")) == NULL) {
       perror("opening local file for writing");
@@ -44,7 +41,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
     }
     memcpy(sendbuf, (char [2]){0, 1}, 2*sizeof(char));
     // strncat(sendbuf, OPCODE_RRQ, 2);
-    bufferPos += 2;
+    rqBufferPos += 2;
   } else {
     if ((ioFile = fopen(file_name, "r")) == NULL) {
       perror("opening local file for reading");
@@ -52,19 +49,19 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
     }
     memcpy(sendbuf, (char [2]){0, 2}, 2*sizeof(char));
     // strncat(sendbuf, OPCODE_WRQ, 2);
-    bufferPos += 2;
+    rqBufferPos += 2;
   }
 
   // Add the target file name into the buffer
-  strcpy(&sendbuf[bufferPos], file_name);
-  bufferPos += strlen(file_name);
-  sendbuf[bufferPos] = '\0';
-  bufferPos++;
+  strcpy(&sendbuf[rqBufferPos], file_name);
+  rqBufferPos += strlen(file_name);
+  sendbuf[rqBufferPos] = '\0';
+  rqBufferPos++;
 
-  strcpy(&sendbuf[bufferPos], mode);
-  bufferPos += strlen(mode);
-  sendbuf[bufferPos] = '\0';
-  bufferPos++;
+  strcpy(&sendbuf[rqBufferPos], mode);
+  rqBufferPos += strlen(mode);
+  sendbuf[rqBufferPos] = '\0';
+  rqBufferPos++;
 
   /* printf("The packet so far: ");
   for (index = 0; index < bufferPos; index++) {
@@ -72,7 +69,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   }
   printf("\n"); */
 
-  if ((numbytes = sendto(sockfd, sendbuf, bufferPos, 0,
+  if ((numbytes = sendto(sockfd, sendbuf, rqBufferPos, 0,
 			 (struct sockaddr *)&their_addr,
 			 sizeof(struct sockaddr))) == -1) {
     perror("sendto");
@@ -89,8 +86,9 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 
   if (rflag) {
     block_number = 1;
+    addBufferPos = 4;
     while (loopcond) {
-      // log("Calling for return packet\n");
+      log("Calling for return packet\n");
       addr_len = sizeof(struct sockaddr_in);
       if ((numbytes = recvfrom(sockfd, recvbuf, MAXBUFLEN - 1, 0,
 	  (struct sockaddr *)&their_addr, &addr_len)) == -1) {
@@ -120,10 +118,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
           sendbuf[0] = '\0';
           memcpy(sendbuf, (char [4]){0, 4, block_number / 10, 
 		 block_number % 10}, 4*sizeof(char));
-          //sendbuf[2] = block_number / 10 + 48;
-          //sendbuf[3] = block_number % 10 + 48;
-          bufferPos = 4;
-	  if ((numbytes = sendto(sockfd, sendbuf, bufferPos, 0,
+	  if ((numbytes = sendto(sockfd, sendbuf, addBufferPos, 0,
 	      (struct sockaddr *)&their_addr,
               sizeof(struct sockaddr))) == -1) {
             perror("sendto");
@@ -141,7 +136,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   } else if (wflag) {
     block_number = 0;
     while (loopcond) {
-      // log("Calling for return packet\n");
+      log("Calling for return packet\n");
       addr_len = sizeof(struct sockaddr_in);
       if ((numbytes = recvfrom(sockfd, recvbuf, MAXBUFLEN - 1, 0,
         (struct sockaddr *)&their_addr, &addr_len)) == -1) {
@@ -162,11 +157,11 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
           strcat(sendbuf, OPCODE_DAT);
           sendbuf[2] = (char)(block_number / 10 + 48);
           sendbuf[3] = (char)(block_number % 10 + 48);
-	  bufferPos = 4;
+	  addBufferPos = 4;
 	  // Add the data to the packet!
           if (fgets(fileLine, MAXDATALEN, ioFile) != NULL) {
 	    fileLine[strlen(fileLine) -1] = '\0';
-	    bufferPos += strlen(fileLine);
+	    addBufferPos += strlen(fileLine);
             strcat(sendbuf, fileLine);
 	  } else {
 	    perror("reading from local file");
@@ -174,11 +169,11 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	  }
           /*sentinel = fgets(fileLine, MAXDATALEN, ioFile);
 	  fileLine[strlen(fileLine) - 1] = '\0';
-          bufferPos += strlen(fileLine);
+          addBufferPos += strlen(fileLine);
           if (sentinel != NULL) {
             strcat(sendbuf, fileLine);
 	    } */
-	  if ((numbytes = sendto(sockfd, sendbuf, bufferPos, 0,
+	  if ((numbytes = sendto(sockfd, sendbuf, addBufferPos, 0,
 	      (struct sockaddr *)&their_addr,
 	      sizeof(struct sockaddr))) == -1) {
 	    perror("sendto");
