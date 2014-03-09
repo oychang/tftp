@@ -12,6 +12,9 @@
 #define DEFAULT_SERVER_PORT 3335
 #define DEFAULT_CLIENT_PORT 3335
 
+// Global declaration for use in Logging.h
+int VERBOSE = false;
+
 // print the usage strings to stderr
 void print_usage(void);
 

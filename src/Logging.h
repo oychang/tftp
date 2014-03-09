@@ -4,7 +4,7 @@
 // Macro that depends on a global variable to be set to true/falsey
 // and prints to stdout with normal printf formatting information.
 #include <stdio.h>
-static int VERBOSE = 0;
+extern int VERBOSE;
 #define log(format_string, ...) \
         if (VERBOSE) printf("%s: " format_string, __FUNCTION__, ##__VA_ARGS__)
 

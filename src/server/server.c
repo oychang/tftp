@@ -1,12 +1,8 @@
 #include "server.h"
 //=============================================================================
 int
-tftp_server(const int port, const int is_verbose)
+tftp_server(const int port)
 {
-    // must reset or else value is lost
-    // XXX: there's got to be a better way of handling globals than this
-    VERBOSE = is_verbose;
-
     // Setup listening on our pseudo well-known port.
     struct sockaddr_in well_known_addr;
     const int well_known_sockfd = get_bound_sockfd(port, &well_known_addr);

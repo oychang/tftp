@@ -8,7 +8,6 @@ main(int argc, char *argv[])
 {
     static const char * optstr = "lp:vrwh";
     int is_server = false;
-    int is_verbose = false;
     int is_read = false;
     char * file = NULL;
     char * host = NULL;
@@ -24,7 +23,7 @@ main(int argc, char *argv[])
             port = atoi(optarg);
             break;
         case 'v':
-            VERBOSE = is_verbose = true;
+            VERBOSE = true;
             break;
         case 'r':
             is_read = true;
@@ -41,8 +40,8 @@ main(int argc, char *argv[])
     // Check and call server
     if (is_server == true) {
         port = (port == -1) ? DEFAULT_SERVER_PORT : port;
-        log("args are port=%d, is_verbose=%d\n", port, is_verbose);
-        return tftp_server(port, is_verbose);
+        log("args are port=%d, is_verbose=%d\n", port, VERBOSE);
+        return tftp_server(port);
     }
 
     // Get keyword arguments, check and call client
@@ -58,8 +57,8 @@ main(int argc, char *argv[])
 
     port = (port == -1) ? DEFAULT_CLIENT_PORT : port;
     log("args are port=%d, is_verbose=%d, is_read=%d, file=%s, host=%s\n",
-        port, is_verbose, is_read, file, host);
-    return tftp_client(port, is_verbose, is_read, file, host);
+        port, VERBOSE, is_read, file, host);
+    return tftp_client(port, is_read, file, host);
 }
 
 void

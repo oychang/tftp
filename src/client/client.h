@@ -22,6 +22,6 @@
 #define OPCODE_DAT "03"
 #define OPCODE_ACK "04"
 
-int tftp_client(int, int, int, char *, char *);
+int tftp_client(int, int, char *, char *);
 
 #endif

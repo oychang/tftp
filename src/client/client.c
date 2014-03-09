@@ -1,8 +1,6 @@
 #include "client.h"
 
-int tftp_client(int port, int vflag, int rflag,
-  char *file_name, char *host_name) {
-  VERBOSE = vflag;
+int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 
   int sockfd;
   struct sockaddr_in their_addr;

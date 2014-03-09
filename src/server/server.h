@@ -43,7 +43,7 @@ struct session_t {
 // Main jumping off point for operation.
 // port: port to listen on for read/write requests
 // is_verbose: true/false flag that indicates whether or not to log
-int tftp_server(const int port, const int is_verbose);
+int tftp_server(const int port);
 
 int get_bound_sockfd(const int port, struct sockaddr_in * sin);
 void send_packet(int sockfd, struct sockaddr_in * fromaddr,
