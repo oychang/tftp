@@ -121,24 +121,7 @@ parse_request_packet(session_t * session, int is_read)
     session->fn[MAX_STRING_LEN-1] = '\0'; // ensure null-terminated
     log("got filename as %s\n", session->fn);
 
-    // Check filename is accessible
-    // (1): only current directory allowed (no ../foo or /foo)
-    // (2): only do if accessible to everyone
-    struct stat statbuf;
-    if (strstr(session->fn, "..") != NULL) {
-        log("terminating: found up traversal\n");
-        prepare_error_packet(session, 2, "no up traversal");
-        return SEND_RESET;
-    } else if (is_read) {
-        if (!stat(session->fn, &statbuf)
-            && (statbuf.st_mode & UGOR) != UGOR) {
-            log("terminating: file not readable by all\n");
-            prepare_error_packet(session, 2, "bad read permissions");
-            return SEND_RESET;
-        }
-    }
-
-    // Check mode equal to octet
+    // Check mode equal to octet.
     const size_t filename_len = strlen(session->fn); // get for offset
     static const char * octet = "octet";
     const size_t octet_len = strlen(octet);
@@ -148,12 +131,26 @@ parse_request_packet(session_t * session, int is_read)
         return SEND_RESET;
     }
 
-    // So we can access the file!
-    // Now, open a file descriptor to it
-    // TODO: vvvvvv remove this
-    if (!is_read)
-        strcat(session->fn, ".tftp");
-    // TODO ^^^^^^^
+    // Check filename is accessible
+    // (1): only current directory allowed (no ../foo or /foo)
+    // (2): only do if accessible to everyone
+    struct stat statbuf;
+    int statret = stat(session->fn, &statbuf);
+    if (strstr(session->fn, "..") != NULL || session->fn[0] == '/') {
+        log("terminating: found up traversal\n");
+        prepare_error_packet(session, 2, "no up traversal");
+        return SEND_RESET;
+    } else if (!statret) {
+        if (is_read && (statbuf.st_mode & UGOR) != UGOR) {
+            log("terminating: file not readable by all\n");
+            prepare_error_packet(session, 2, "bad read permissions");
+            return SEND_RESET;
+        } else {
+            log("file already exists on this machine...about to overwrite\n");
+        }
+    }
+
+    // So we can access the file with a good filename at this point.
     log("opening file '%s' mode '%s'\n", session->fn, is_read ? "r" : "w");
     session->file = fopen(session->fn, is_read ? "r" : "w");
 
