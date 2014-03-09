@@ -197,7 +197,7 @@ parse_data_packet(session_t * session)
     }
 
     // Otherwise, save the data to disk
-    log("writing out %ld bytes to %s\n", session->recvbytes - 4, session->fn);
+    log("writing out %zd bytes to %s\n", session->recvbytes - 4, session->fn);
     fwrite(&session->recvbuf[4], sizeof(char),
         session->recvbytes - 4, session->file);
 
@@ -400,7 +400,7 @@ packet_listener(int sockfd, session_t * session, struct sockaddr_in * fromaddr)
         MAX_BUFFER_LEN - 1, 0, (struct sockaddr *)fromaddr, &fromaddr_len);
 
     if (VERBOSE) {
-        log("received %ld bytes\n", session->recvbytes);
+        log("received %zd bytes\n", session->recvbytes);
         if (session->recvbytes == -1)
             perror("recvfrom");
         else {
@@ -429,7 +429,7 @@ send_packet(int sockfd, struct sockaddr_in * fromaddr, session_t * session)
         struct sockaddr_in addr;
         socklen_t socklen = sizeof(struct sockaddr);
         getsockname(sockfd, (struct sockaddr *)&addr, &socklen);
-        log("wanted to send %ld bytes; actually sent %ld bytes\n",
+        log("wanted to send %zd bytes; actually sent %zd bytes\n",
             session->sendbytes, sent_bytes);
         log("sent from %s:%d\n",
             inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
