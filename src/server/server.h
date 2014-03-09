@@ -47,8 +47,8 @@ void setup_my_sin(struct sockaddr_in * sin, int port);
 
 // Wrapper around recvfrom() setup and logging. Blocks until data or timeout.
 // Listens for up to MAX_BUFFER_LEN - 1 bytes of data.
-// Returns -1 on failure or else the number of received bytes
-ssize_t packet_listener(int sockfd, buffer buf, struct sockaddr_in * fromaddr);
+void packet_listener(int sockfd, session_t * session,
+    struct sockaddr_in * fromaddr);
 
 // Sends the TFTP data held within session's sendbuf to fromaddr with my
 // sockfd. Wrapper around sendto() and accompanying logging.
@@ -60,24 +60,23 @@ void send_packet(int sockfd, struct sockaddr_in * fromaddr,
 // the session struct by looking at what response needs to be sent
 // and creating it in the sendbuf.
 
-
 // TODO: document
-// Parse packet and prepare response (if applicable).
+// TODO: timeouts & infinity loop removal on macro & refactor & check tid & int types
+// Parse received packet and prepare response (if applicable).
 // Return Values:
 //    -1: do not send anything (either error or timeout) & do NOT reset
 // error: send ready error, reset connection information
 //  else: enum opcode for type of packet to send
-int parse_packet(session_t * session);
-int parse_request_packet(session_t * session, int is_read);
-int parse_data_packet(session_t * session);
-int parse_ack_packet(session_t * session);
-int parse_error_packet(session_t * session);
+enum response_action parse_packet(session_t * session);
+enum response_action parse_request_packet(session_t * session, int is_read);
+enum response_action parse_data_packet(session_t * session);
+enum response_action parse_ack_packet(session_t * session);
+enum response_action parse_error_packet(session_t * session);
 void reset_session(session_t * session);
 
 // These all build up their respective packets, setting sendbuf & sendbytes.
 // prepare_error_packet() expects an errcode 0--7 and a valid C string.
-void prepare_error_packet(session_t * session,
-    char errcode, char * errmsg);
+void prepare_error_packet(session_t * session, char errcode, char * errmsg);
 void prepare_ack_packet(session_t * session);
 void prepare_data_packet(session_t * session);
 

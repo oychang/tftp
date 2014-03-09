@@ -5,15 +5,17 @@ tftp_server(const int port)
 {
     // Setup listening on our pseudo well-known port.
     struct sockaddr_in well_known_addr;
-    const int well_known_sockfd = get_bound_sockfd(port, &well_known_addr);
+    const int          well_known_sockfd = get_bound_sockfd(port,
+                                                &well_known_addr);
+    // These will change depending on whether we have a connection or not.
     struct sockaddr_in ephemeral_addr;
-    int current_sockfd = well_known_sockfd;
+    int                current_sockfd = well_known_sockfd;
     // Information about client
     struct sockaddr_in client_addr;
-    int client_tid = -1; // simply a port
+    // Hold information about block numbers, buffers, and byte counts.
+    session_t          session;
+    reset_session(&session);
 
-    session_t session;
-    session.status = IDLE;
     // In this loop, we have to make sure that TIDs get sorted out.
     // Cases:
     // (1) if session is idle, listen on our "well-known port" (default
@@ -22,100 +24,82 @@ tftp_server(const int port)
     // a singular TID (i.e. only respond to things on one port, ostensibly
     // from the same client)
     log("entering main program loop\n");
-    while (true) {
-        session.recvbytes = packet_listener(current_sockfd, session.recvbuf,
-            &client_addr);
+    enum response_action act = SEND;
+    // If LOOP_FOREVER set to true in header file, will continue indefinitely.
+    while (act == SEND || act == NOOP || LOOP_FOREVER) {
+        packet_listener(current_sockfd, &session, &client_addr);
+        // Check for proper TID (i.e. that port matches up to what we expect)
+        if (session.status == IDLE) {
+            log("initial connection...assigning ports\n");
+            session.client_tid = ntohs(client_addr.sin_port);
+            log("client sends packets from %d\n", session.client_tid);
+            log("obtaining ephemeral port\n");
+            current_sockfd = get_bound_sockfd(0, &ephemeral_addr);
+        }
 
         // Parse packet and prepare response
-        int parser_ret;
-        switch ((parser_ret = parse_packet(&session))) {
-        case DATA: case ACK:
-            // Get a TID if this is a response to a request
-            if (client_tid == -1) {
-                client_tid = ntohs(client_addr.sin_port);
-                log("listening for packets from %d\n", client_tid);
-
-                log("obtaining ephemeral port\n");
-                current_sockfd = get_bound_sockfd(0, &ephemeral_addr);
-            }
-
-            log("sending initial packet\n");
+        switch ((act = parse_packet(&session))) {
+        case SEND:
+            log("sending packet\n");
             send_packet(current_sockfd, &client_addr, &session);
-
-            if ((parser_ret == DATA && session.sendbytes < 516)
-                || (parser_ret == ACK && session.block_n > 0 &&
-                    session.recvbytes < 516)) {
-                log("partial data packet...now resetting\n");
-                client_tid = -1;
-                reset_session(&session);
-                close(current_sockfd);
-                current_sockfd = well_known_sockfd;
-            }
-
             break;
-        case ERROR:
-            log("sending packet and then resetting connection\n");
+        case SEND_RESET:
             send_packet(current_sockfd, &client_addr, &session);
-
-            client_tid = -1;
             reset_session(&session);
             close(current_sockfd);
             current_sockfd = well_known_sockfd;
             break;
-        case 0:
-            log("resetting connection\n");
-
-            client_tid = -1;
+        case RESET:
             reset_session(&session);
             close(current_sockfd);
             current_sockfd = well_known_sockfd;
             break;
-        default: case -1:
+        case NOOP: default:
             log("ignoring this packet\n");
             break;
         }
     }
 
-    // This code will never be called since the loop above is infinite.
-    // The kernel will handle closing the sockfd itself.
-    log("closing down\n");
-    close(current_sockfd);
+    log("closing down program\n");
     return EXIT_SUCCESS;
 }
 //=============================================================================
-int
+enum response_action
 parse_packet(session_t * session)
 {
     // Do a basic check for opcode validity
     if (session->recvbytes == -1) {
-        log("timeout. not parsing\n");
-        return -1;
+        if (session->status != IDLE) {
+            log("no response...retransmitting\n");
+            return SEND;
+        } else {
+            log("no signal & idle...ignoring\n");
+            return NOOP;
+        }
     } else if (session->recvbuf[0] != 0
         || session->recvbuf[1] < 1
         || session->recvbuf[1] > 5) {
-        log("got invalid opcode...not parsing\n");
-        return -1;
-    } else {
-        log("found opcode as 0%d\n", session->recvbuf[1]);
+        log("got invalid opcode.\n");
+        prepare_error_packet(session, 0, "invalid opcode");
+        return SEND_RESET;
     }
 
+    log("found opcode as 0%d\n", session->recvbuf[1]);
     // These enum values are set to their opcodes, so we can switch
     // on either one--this is easier to read.
     switch (session->recvbuf[1]) {
-    case RRQ:
-        return parse_request_packet(session, true);
-    case WRQ:
-        return parse_request_packet(session, false);
-    case DATA:
-        return parse_data_packet(session);
-    case ACK:
-        return parse_ack_packet(session);
-    case ERROR:
-        return parse_error_packet(session);
-    default:
-        return -1;
+    case RRQ:   return parse_request_packet(session, true);
+    case WRQ:   return parse_request_packet(session, false);
+    case DATA:  return parse_data_packet(session);
+    case ACK:   return parse_ack_packet(session);
+    case ERROR: return parse_error_packet(session);
+    default:    return NOOP;
     }
 }
+
+
+
+
 //-----------------------------------------------------------------------------
 void
 prepare_error_packet(session_t * session, char errcode, char * errmsg)
@@ -170,24 +154,24 @@ prepare_data_packet(session_t * session)
     return;
 }
 //=============================================================================
-int
+enum response_action
 parse_request_packet(session_t * session, int is_read)
 {
     // Check that the packet is a good size
     // Opcode + 1 Char filename + \0 + 1 Char mode + \0
     static const int min_req_length = 2 + 1 + 1 + 1 + 1;
     if (session->status != IDLE) {
-        log("transfer in progress, ignoring request\n");
-        return -1;
+        log("transfer in progress\n");
+        prepare_error_packet(session, 5, "only one transfer at a time");
+        return SEND;
     } else if (session->recvbytes < min_req_length) {
-        log("aborting: request packet too short (min length is %d)\n",
-            min_req_length);
+        log("aborting: request packet too short\n");
         prepare_error_packet(session, 0, "request too short");
-        return ERROR;
+        return SEND_RESET;
     }
 
     // Set staus
-    session->status = (is_read ? SEND : RECV);
+    session->status = (is_read ? READ : WRITE);
     log("parsing %s packet\n", is_read ? "RRQ" : "WRQ");
 
     // Set filename field
@@ -202,13 +186,13 @@ parse_request_packet(session_t * session, int is_read)
     if (strstr(session->fn, "..") != NULL) {
         log("terminating: found up traversal\n");
         prepare_error_packet(session, 2, "no up traversal");
-        return ERROR;
+        return SEND_RESET;
     } else if (is_read) {
         if (!stat(session->fn, &statbuf)
-            && (statbuf.st_mode & (UGOR)) != (UGOR)) {
+            && (statbuf.st_mode & UGOR) != UGOR) {
             log("terminating: file not readable by all\n");
             prepare_error_packet(session, 2, "bad read permissions");
-            return ERROR;
+            return SEND_RESET;
         }
     }
 
@@ -219,103 +203,110 @@ parse_request_packet(session_t * session, int is_read)
     if (strncasecmp(&session->recvbuf[2+filename_len+1], octet, octet_len)) {
         log("aborting: only octet mode supported\n");
         prepare_error_packet(session, 0, "only octet supported");
-        return ERROR;
+        return SEND_RESET;
     }
 
     // So we can access the file!
     // Now, open a file descriptor to it
+    // TODO: vvvvvv remove this
     if (!is_read)
         strcat(session->fn, ".tftp");
+    // TODO ^^^^^^^
     log("opening file '%s' mode '%s'\n", session->fn, is_read ? "r" : "w");
     session->file = fopen(session->fn, is_read ? "r" : "w");
 
-    // Set initial block number
+    // Response depends on type of request
     if (is_read) {
         session->block_n = 1;
         prepare_data_packet(session);
-        return DATA;
+    } else {
+        session->block_n = 0;
+        prepare_ack_packet(session);
     }
-    session->block_n = 0;
-    prepare_ack_packet(session);
-    return ACK;
+
+    return SEND;
 }
 
-int
+enum response_action
 parse_data_packet(session_t * session)
 {
     // Check that packet is a good size
     // Opcode (2B) + Block Number (2B) + n bytes (max 512)
     static const int min_data_len = 2 + 2 + 0; // can get 0 bytes
     static const int max_data_len = 2 + 2 + 512;
-    if (session->status != RECV) {
-        log("no request or we are sender; can't write data packet");
-        return -1;
+    if (session->status != WRITE) {
+        log("no request or we are sender...data meaningless\n");
+        prepare_error_packet(session, 4, "send WRQ before data");
+        return SEND_RESET;
     } else if (session->recvbytes > max_data_len
         || session->recvbytes < min_data_len) {
-        log("aborting: data packet size is wrong\n");
+        log("data packet size is wrong\n");
         prepare_error_packet(session, 0, "bad data packet size");
-        return ERROR;
+        return SEND_RESET;
     }
 
-    // Set block number
+    // Get block number
     log("parsing data packet\n");
     unsigned int block_number = (session->recvbuf[2]<<8) + session->recvbuf[3];
     log("got block number as %u\n", block_number);
-    // Check for Sorcerer's Apprentice Bug
-    // That is, check if we've already sent an ACK for the block number
-    // we just received and if so, ignore this packet.
+    // Check for delayed duplicate packet. If we've already gotten this
+    // data block, safely ignore it.
     if (block_number <= session->block_n) {
-        log("SAS detected\n");
-        log("Got block# %u while expecting block# %u\n",
+        log("Got block %u while expecting block %u\n",
             block_number, session->block_n);
-        return -1;
-    } else
-        session->block_n++;
+        return NOOP;
+    }
 
-    // Write data out to disk
+    // Otherwise, save the data to disk
     log("writing out %ld bytes to %s\n", session->recvbytes - 4, session->fn);
     fwrite(&session->recvbuf[4], sizeof(char),
         session->recvbytes - 4, session->file);
 
+    session->block_n++;
     prepare_ack_packet(session);
-    return ACK;
+    return (session->recvbytes < 516) ? SEND_RESET : SEND;
 }
 
 
-int
+enum response_action
 parse_ack_packet(session_t * session)
 {
     log("parsing ack packet\n");
 
-    // Get block number
+    // Get block number and check that it's what we're expecting.
+    // If not, then it must be less than our number and gotten delayed.
+    // So, we can feel confident ignoring it (and should to avoid
+    // Sorcerer's Apprentice Syndrome).
     unsigned int block_number = (session->recvbuf[2]<<8) + session->recvbuf[3];
-    log("got block number %u\n", block_number);
+    log("got ack for block number %u\n", block_number);
+    if (block_number != session->block_n) {
+        log("got duplicate ack...ignoring\n");
+        return NOOP;
+    }
 
-    if (block_number != session->block_n)
-        return -1;
-    else
-        session->block_n++;
-
+    session->block_n++;
     prepare_data_packet(session);
-    return DATA;
+    return (session->sendbytes < 516) ? SEND_RESET : SEND;
 }
 
 void
 reset_session(session_t * session)
 {
     log("resetting transfer\n");
+
     session->status = IDLE;
     session->fn[0] = '\0';
     session->block_n = 0;
-    if (session->file != NULL) {
-        fclose(session->file);
-        session->file = NULL;
-    }
+    session->client_tid = -1;
+    // if (session->file != NULL) {
+    //     fclose(session->file);
+    //     session->file = NULL;
+    // }
 
     return;
 }
 
-int
+enum response_action
 parse_error_packet(session_t * session)
 {
     log("parsing error packet\n");
@@ -325,8 +316,17 @@ parse_error_packet(session_t * session)
     fprintf(stderr, "Could not transfer %s; got code %u, message: '%s'\n",
         session->fn, error_code, &session->recvbuf[4]);
 
-    return 0;
+    // Any error constitutes an immediate premature termination and
+    // requires no response.
+    return RESET;
 }
+
+
+
+
+
+
+
 
 int
 get_bound_sockfd(const int port, struct sockaddr_in * sin)
@@ -406,24 +406,26 @@ setup_my_sin(struct sockaddr_in * sin, int port)
     return;
 }
 //-----------------------------------------------------------------------------
-ssize_t
-packet_listener(int sockfd, buffer buf, struct sockaddr_in * fromaddr)
+void
+packet_listener(int sockfd, session_t * session, struct sockaddr_in * fromaddr)
 {
     log("listening for new packet on sockfd %d\n", sockfd);
     // XXX: We discard and do not check this value
     socklen_t fromaddr_len = sizeof(struct sockaddr);
-    ssize_t recvbytes = recvfrom(sockfd, buf, MAX_BUFFER_LEN - 1, 0,
-        (struct sockaddr *)fromaddr, &fromaddr_len);
+    session->recvbytes = recvfrom(sockfd, session->recvbuf,
+        MAX_BUFFER_LEN - 1, 0, (struct sockaddr *)fromaddr, &fromaddr_len);
 
-    log("received %ld bytes\n", recvbytes);
-    if (recvbytes == -1)
-        perror("recvfrom");
-    else {
-        log("packet originated from %s:%d\n", inet_ntoa(fromaddr->sin_addr),
-            ntohs(fromaddr->sin_port));
+    if (VERBOSE) {
+        log("received %ld bytes\n", session->recvbytes);
+        if (session->recvbytes == -1)
+            perror("recvfrom");
+        else {
+            log("packet originated from %s:%d\n",
+                inet_ntoa(fromaddr->sin_addr), ntohs(fromaddr->sin_port));
+        }
     }
 
-    return recvbytes;
+    return;
 }
 //-----------------------------------------------------------------------------
 void
