@@ -1,3 +1,3 @@
 *.o
 tftp
-test/*/*
+test/

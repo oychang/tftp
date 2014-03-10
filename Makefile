@@ -8,8 +8,9 @@ tftp: server.o client.o tftp.c tftp.h Boolean.h Logging.h
 server.o: server.c server.h Boolean.h Logging.h Types.h
 client.o: client.c client.h Logging.h
 
+
 .PHONY: clean test
 clean:
 	rm -f *.o
-test:
-	sh test/test.sh
+test: tftp
+	sh test.sh
