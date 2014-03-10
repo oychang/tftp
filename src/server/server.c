@@ -134,6 +134,7 @@ parse_request_packet(session_t * session, int is_read)
     // Check filename is accessible
     // (1): only current directory allowed (no ../foo or /foo)
     // (2): only do if accessible to everyone
+    // XXX: Assume that if the file exists, we'll be able to stat it
     struct stat statbuf;
     int statret = stat(session->fn, &statbuf);
     if (strstr(session->fn, "..") != NULL || session->fn[0] == '/') {
