@@ -13,4 +13,4 @@ client.o: client.c client.h Logging.h
 clean:
 	rm -f *.o
 test: tftp
-	sh test.sh
+	bash test.sh
