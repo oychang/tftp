@@ -2,8 +2,10 @@
 
 int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 
-  int sockfd;
+  int default_sockfd;
+  int current_sockfd;
   struct sockaddr_in their_addr;
+  struct sockaddr_in ephemeral;
   struct hostent *he;
   struct sockaddr_in my_addr;
   unsigned int addr_len;
@@ -15,6 +17,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   int rqBufferPos = 0;
   int addBufferPos = 4;
   int loopcond = 1;
+  int first_packet;
   int block_number;
   FILE *ioFile;
   char fileLine[MAXDATALEN];
@@ -23,7 +26,8 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
     perror("gethostbyname");
     exit(1);
   }
-  if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+
+  if ((default_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
     perror("socket");
     exit(1);
   }
@@ -31,6 +35,13 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   their_addr.sin_port = htons(port);
   their_addr.sin_addr = *((struct in_addr *)he->h_addr);
   memset(&(their_addr.sin_zero), '\0', 8);
+  if (bind(default_sockfd, (struct sockaddr *)&their_addr, 
+      sizeof(struct sockaddr)) == -1) {
+    perror("bind");
+    exit(1);
+  }
+  
+  current_sockfd = default_sockfd;
 
   // Pack and send the initial read/write request; establish connection
   // if rflag is set, opcode 01; if wflag is set, opcode 02
@@ -63,7 +74,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   sendbuf[rqBufferPos] = '\0';
   rqBufferPos++;
 
-  if ((numbytes = sendto(sockfd, sendbuf, rqBufferPos, 0,
+  if ((numbytes = sendto(current_sockfd, sendbuf, rqBufferPos, 0,
 			 (struct sockaddr *)&their_addr,
 			 sizeof(struct sockaddr))) == -1) {
     perror("sendto");
@@ -72,22 +83,41 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   log("Preparing to send %d bytes to %s\n", numbytes,
 	 inet_ntoa(their_addr.sin_addr));
   addr_len = sizeof(struct sockaddr_in);
-  getsockname(sockfd, (struct sockaddr *)&my_addr, &addr_len);
+  getsockname(current_sockfd, (struct sockaddr *)&my_addr, &addr_len);
   log("Sent %d bytes from port %d\n", numbytes, ntohs(my_addr.sin_port));
 
   //  printf("Sleeping for 5 seconds\n");
   //  sleep(5);
 
   if (rflag) {
+    first_packet = 1;
     block_number = 1;
     while (loopcond) {
       log("Calling for return packet from server...\n");
       addr_len = sizeof(struct sockaddr_in);
-      if ((numbytes = recvfrom(sockfd, recvbuf, MAXBUFLEN - 1, 0,
+      if ((numbytes = recvfrom(current_sockfd, recvbuf, MAXBUFLEN - 1, 0,
 	  (struct sockaddr *)&their_addr, &addr_len)) == -1) {
 	perror("recvfrom");
         exit(1);
       }
+
+      if (first_packet) {
+	first_packet = 0;
+	if ((current_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+	  perror("socket");
+	  exit(1);
+	}
+	ephemeral.sin_family = AF_INET;
+	ephemeral.sin_port = htons(port);
+	ephemeral.sin_addr = *((struct in_addr *)he->h_addr);
+	memset(&(ephemeral.sin_zero), '\0', 8);
+	if (bind(current_sockfd, (struct sockaddr *)&ephemeral, 
+		 sizeof(struct sockaddr)) == -1) {
+	  perror("bind");
+	  exit(1);
+	}
+      }
+
       log("Got packet from %s, port %d\n",
              inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
       log("Packet is %d bytes long\n", numbytes);
@@ -112,14 +142,14 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 		 block_number % 10}, 4*sizeof(char));
 	  log("Preparing to send %d bytes to %s\n", addBufferPos,
 	      inet_ntoa(their_addr.sin_addr));
-	  if ((numbytes = sendto(sockfd, sendbuf, addBufferPos, 0,
+	  if ((numbytes = sendto(current_sockfd, sendbuf, addBufferPos, 0,
 	      (struct sockaddr *)&their_addr,
               sizeof(struct sockaddr))) == -1) {
             perror("sendto");
             exit(1);
 	  }
 	  addr_len = sizeof(struct sockaddr_in);
-	  getsockname(sockfd, (struct sockaddr *)&my_addr, &addr_len);
+	  getsockname(current_sockfd, (struct sockaddr *)&my_addr, &addr_len);
 	  log("Sent %d bytes (ACK for block %d) from port %d\n", numbytes, 
 	      block_number, ntohs(my_addr.sin_port));
           block_number++;
@@ -127,15 +157,34 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
       }
     }
   } else if (wflag) {
+    first_packet = 1;
     block_number = 0;
     while (loopcond) {
       log("Calling for return packet from server...\n");
       addr_len = sizeof(struct sockaddr_in);
-      if ((numbytes = recvfrom(sockfd, recvbuf, MAXBUFLEN - 1, 0,
+      if ((numbytes = recvfrom(current_sockfd, recvbuf, MAXBUFLEN - 1, 0,
         (struct sockaddr *)&their_addr, &addr_len)) == -1) {
         perror("recvfrom");
         exit(1);
       }
+
+      if (first_packet) {
+	first_packet = 0;
+	if ((current_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+	  perror("socket");
+	  exit(1);
+	}
+	ephemeral.sin_family = AF_INET;
+	ephemeral.sin_port = htons(port);
+	ephemeral.sin_addr = *((struct in_addr *)he->h_addr);
+	memset(&(ephemeral.sin_zero), '\0', 8);
+	if (bind(current_sockfd, (struct sockaddr *)&ephemeral, 
+		 sizeof(struct sockaddr)) == -1) {
+	  perror("bind");
+	  exit(1);
+	}
+      }
+
       log("Got packet from %s, port %d\n",
               inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
       log("Packet is %d bytes long\n", numbytes);
@@ -160,14 +209,14 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	  log("Data to be sent (block %d): %s\n", block_number, &sendbuf[4]);
 	  log("Preparing to send %d bytes to %s\n", addBufferPos, 
 	      inet_ntoa(their_addr.sin_addr));
-	  if ((numbytes = sendto(sockfd, sendbuf, addBufferPos, 0,
+	  if ((numbytes = sendto(current_sockfd, sendbuf, addBufferPos, 0,
 	      (struct sockaddr *)&their_addr,
 	      sizeof(struct sockaddr))) == -1) {
 	    perror("sendto");
 	    exit(1);
 	  }
 	  addr_len = sizeof(struct sockaddr_in);
-	  getsockname(sockfd, (struct sockaddr *)&my_addr, &addr_len);
+	  getsockname(current_sockfd, (struct sockaddr *)&my_addr, &addr_len);
 	  log("Sent %d bytes (data for block %d) from port %d\n", numbytes, 
 	      block_number, ntohs(my_addr.sin_port));
 	  addBufferPos = 4; // Reset buffer position to 2(opcode) + 2(block)
@@ -183,6 +232,6 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
     exit(1);
   }
   log("Terminating communication; closing communication channel!\n");
-  close(sockfd);
+  close(current_sockfd);
   return 0;
 }
