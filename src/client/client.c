@@ -74,6 +74,13 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   log("Successfully bound to default port!\n");
   */
 
+  if ((connect(default_sockfd, (struct sockaddr *)&their_addr,
+	      sizeof(their_addr))) < 0) {
+    perror("connect");
+    exit(1);
+  }
+  log("Connection to the socket established successfully!\n");
+
   current_sockfd = default_sockfd;
 
   // Pack and send the initial read/write request; establish connection
