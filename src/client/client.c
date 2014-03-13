@@ -129,15 +129,13 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	perror("recvfrom");
         exit(1);
       }
-
+      /*
       if (first_packet) {
 	first_packet = 0;
-	their_addr.sin_port = ntohs(their_addr.sin_port);
-	log("Adjusted server port from %d to its ephemeral %d\n",
-	    port, their_addr.sin_port);
-	their_addr.sin_port = htons(their_addr.sin_port);
+	log("Server's default port is %d, but its ephemeral port is %d\n", 
+	    port, ntohs(their_addr.sin_port));
       }
-
+      */
       log("Got packet from %s, port %d\n",
 	  inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
       log("Packet is %d bytes long\n", numbytes);
@@ -164,8 +162,8 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	      addBufferPos, inet_ntoa(their_addr.sin_addr),
 	      ntohs(their_addr.sin_port));
 	  if ((numbytes = sendto(current_sockfd, sendbuf, addBufferPos, 0,
-	      (struct sockaddr *)&their_addr,
-              sizeof(struct sockaddr))) == -1) {
+	       (struct sockaddr *)&their_addr,
+	       sizeof(struct sockaddr))) == -1) {
             perror("sendto");
             exit(1);
 	  }
@@ -174,7 +172,44 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	  log("Sent %d bytes (ACK for block %d) from port %d\n", numbytes, 
 	      block_number, ntohs(my_addr.sin_port));
           block_number++;
-        }
+        } else {
+	  log("Data for block %d was already received; ignoring packet\n",
+	      block_number - 1);
+	}
+      } else if (recvbuf[0] == 0 && recvbuf[1] == OPCODE_ERR) {
+	if (recvbuf[2] == 0) {
+	  loopcond = 0;
+	  switch (recvbuf[3]) {
+	    case 0:
+	      log ("Error Code 0: Not defined, see error message (if any)\n");
+	      log ("Error Message: %s\n", &recvbuf[4]);
+	      loopcond = 1;
+	      break;
+	    case 1:
+	      log ("Error Code 1: File not found\n");
+	      break;
+	    case 2:
+	      log ("Error Code 2: Access violation\n");
+	      break;
+	    case 3:
+	      log ("Error Code 3: Disk full or allocation exceeded\n");
+	      break;
+	    case 4:
+	      log ("Error Code 4: Illegal TFTP operation\n");
+	      break;
+	    case 5:
+	      log ("Error Code 5: Unknown transfer ID\n");
+	      break;
+	    case 6:
+	      log ("Error Code 6: File already exists\n");
+	      break;
+	    case 7:
+	      log ("Error Code 7: No such user\n");
+	      break;
+	  }
+	}
+      } else {
+	log("Opcode Mismatch... Expecting data packets; ignoring packet\n");
       }
     }
   } else if (wflag) {
@@ -191,10 +226,8 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 
       if (first_packet) {
 	first_packet = 0;
-	their_addr.sin_port = ntohs(their_addr.sin_port);
-	log("Adjusted server port from %d to its ephemeral %d\n",
-	    port, their_addr.sin_port);
-	their_addr.sin_port = htons(their_addr.sin_port);
+	log("Server's default port is %d, but its ephemeral port is %d\n", 
+	    port, ntohs(their_addr.sin_port));
       }
 
       log("Got packet from %s, port %d\n",
@@ -236,7 +269,44 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
           if (numbytes < 516) {
             loopcond = 0;
 	  }
-        }
+        } else {
+	  log("Ack for block %d was already received; ignoring packet\n",
+	      block_number - 1);
+	}
+      } else if (recvbuf[0] == 0 && recvbuf[1] == OPCODE_ERR) {
+	if (recvbuf[2] == 0) {
+	  loopcond = 0;
+	  switch (recvbuf[3]) {
+	    case 0:
+	      log ("Error Code 0: Not defined, see error message (if any)\n");
+	      log ("Error Message: %s\n", &recvbuf[4]);
+	      loopcond = 1;
+	      break;
+	    case 1:
+	      log ("Error Code 1: File not found\n");
+	      break;
+	    case 2:
+	      log ("Error Code 2: Access violation\n");
+	      break;
+	    case 3:
+	      log ("Error Code 3: Disk full or allocation exceeded\n");
+	      break;
+	    case 4:
+	      log ("Error Code 4: Illegal TFTP operation\n");
+	      break;
+	    case 5:
+	      log ("Error Code 5: Unknown transfer ID\n");
+	      break;
+	    case 6:
+	      log ("Error Code 6: File already exists\n");
+	      break;
+	    case 7:
+	      log ("Error Code 7: No such user\n");
+	      break;
+	  }
+	}
+      } else {
+	log("Opcode Mismatch... Expecting ack packets; ignoring packet\n");
       }
     }
   }
