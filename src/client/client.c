@@ -6,7 +6,6 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   int default_sockfd;              // Socket descriptor
   int current_sockfd;              // Socket descriptor
   struct sockaddr_in their_addr;   // Structure to hold server IP address
-  struct sockaddr_in ephemeral;    // Structure to hold ephemeral IP
   struct sockaddr_in my_addr;      // Structure to hold client IP address
   unsigned int addr_len;           // Designates length of IP addresses
   struct hostent *he;              // Pointer to a host table entry
@@ -111,7 +110,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
     perror("sendto");
     exit(1);
   }
-  log("Sending %d bytes to %s on server port %d\n", numbytes,
+  log("Sending %d bytes to %s, server default port: %d\n", numbytes,
       inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
   addr_len = sizeof(struct sockaddr_in);
   getsockname(current_sockfd, (struct sockaddr *)&my_addr, &addr_len);
@@ -134,42 +133,9 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 
       if (first_packet) {
 	first_packet = 0;
-	/* if ((current_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-	  perror("socket");
-	  exit(1);
-	}
-	log("Success in obtaining UDP sockfd %d\n", default_sockfd);
-	if (setsockopt(current_sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, 
-		       sizeof(int)) == -1) {
-	  perror("setsockopt");
-	  log("Continuing without port reuse\n");
-	} else {
-	  log("Successfully set port reuse\n");
-	}
-	if (setsockopt(current_sockfd, SOL_SOCKET, SO_RCVTIMEO, 
-		       (void*)&timeout, sizeof(struct timeval)) == -1) {
-	  perror("setsockopt");
-	  log("Continuing without receive timeout\n");
-	} else {
-	  log("Successfully set receive timeout to %d seconds\n", TIMEOUT_SEC);
-	}
-	if (setsockopt(current_sockfd, SOL_SOCKET, SO_SNDTIMEO, 
-		       (void*)&timeout, sizeof(struct timeval)) == -1) {
-	  perror("setsockopt");
-	  log("Continuing without send timeout\n");
-	} else {
-	  log("Successfully set send timeout to %d seconds\n", TIMEOUT_SEC);
-	  } */
-	//ephemeral.sin_family = AF_INET;
 	their_addr.sin_port = ntohs(their_addr.sin_port);
-	//ephemeral.sin_addr = *((struct in_addr *)he->h_addr);
-	//memset(&(ephemeral.sin_zero), '\0', 8);
-	/* if (bind(current_sockfd, (struct sockaddr *)&ephemeral, 
-		 sizeof(struct sockaddr)) == -1) {
-	  perror("bind");
-	  exit(1);
-	}
-	log("Successfully bound to ephemeral port!\n"); */
+	log("Adjusted server port from %d to its ephemeral %d\n",
+	    port, their_addr.sin_port);
       }
 
       log("Got packet from %s, port %d\n",
@@ -224,42 +190,9 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 
       if (first_packet) {
 	first_packet = 0;
-	if ((current_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-	  perror("socket");
-	  exit(1);
-	}
-	log("Success in obtaining UDP sockfd %d\n", default_sockfd);
-	if (setsockopt(current_sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, 
-		       sizeof(int)) == -1) {
-	  perror("setsockopt");
-	  log("Continuing without port reuse\n");
-	} else {
-	  log("Successfully set port reuse\n");
-	}
-	if (setsockopt(current_sockfd, SOL_SOCKET, SO_RCVTIMEO, 
-		       (void*)&timeout, sizeof(struct timeval)) == -1) {
-	  perror("setsockopt");
-	  log("Continuing without receive timeout\n");
-	} else {
-	  log("Successfully set receive timeout to %d seconds\n", TIMEOUT_SEC);
-	}
-	if (setsockopt(current_sockfd, SOL_SOCKET, SO_SNDTIMEO, 
-		       (void*)&timeout, sizeof(struct timeval)) == -1) {
-	  perror("setsockopt");
-	  log("Continuing without send timeout\n");
-	} else {
-	  log("Successfully set send timeout to %d seconds\n", TIMEOUT_SEC);
-	}
-	ephemeral.sin_family = AF_INET;
-	ephemeral.sin_port = htons(0);
-	ephemeral.sin_addr = *((struct in_addr *)he->h_addr);
-	memset(&(ephemeral.sin_zero), '\0', 8);
-	if (bind(current_sockfd, (struct sockaddr *)&ephemeral, 
-		 sizeof(struct sockaddr)) == -1) {
-	  perror("bind");
-	  exit(1);
-	}
-	log("Successfully bound to ephemeral port!\n");
+	their_addr.sin_port = ntohs(their_addr.sin_port);
+	log("Adjusted server port from %d to its ephemeral %d\n",
+	    port, their_addr.sin_port);
       }
 
       log("Got packet from %s, port %d\n",
