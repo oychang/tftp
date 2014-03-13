@@ -123,6 +123,8 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
     block_number = 1;
     while (loopcond) {
       log("Calling for return packet from server...\n");
+      log("Client address = %s, Client port = %d\n",
+	  inet_ntoa(my_addr.sin_addr), ntohs(my_addr.sin_port));
       addr_len = sizeof(struct sockaddr_in);
       if ((numbytes = recvfrom(current_sockfd, recvbuf, MAXBUFLEN - 1, 0,
 	  (struct sockaddr *)&their_addr, &addr_len)) == -1) {
@@ -161,6 +163,8 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	  log("Sending %d bytes to %s, server ephemeral port: %d\n", 
 	      addBufferPos, inet_ntoa(their_addr.sin_addr),
 	      ntohs(their_addr.sin_port));
+	  log("Client address = %s, Client port = %d\n",
+	      inet_ntoa(my_addr.sin_addr), ntohs(my_addr.sin_port));
 	  if ((numbytes = sendto(current_sockfd, sendbuf, addBufferPos, 0,
 	       (struct sockaddr *)&their_addr,
 	       sizeof(struct sockaddr))) == -1) {
