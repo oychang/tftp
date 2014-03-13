@@ -135,10 +135,11 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	their_addr.sin_port = ntohs(their_addr.sin_port);
 	log("Adjusted server port from %d to its ephemeral %d\n",
 	    port, their_addr.sin_port);
+	their_addr.sin_port = htons(their_addr.sin_port);
       }
 
       log("Got packet from %s, port %d\n",
-             inet_ntoa(their_addr.sin_addr), their_addr.sin_port);
+	  inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
       log("Packet is %d bytes long\n", numbytes);
       recvbuf[numbytes] = '\0';
       if (numbytes < MAXBUFLEN) {
@@ -193,10 +194,11 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	their_addr.sin_port = ntohs(their_addr.sin_port);
 	log("Adjusted server port from %d to its ephemeral %d\n",
 	    port, their_addr.sin_port);
+	their_addr.sin_port = htons(their_addr.sin_port);
       }
 
       log("Got packet from %s, port %d\n",
-              inet_ntoa(their_addr.sin_addr), their_addr.sin_port);
+	  inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
       log("Packet is %d bytes long\n", numbytes);
       recvbuf[numbytes] = '\0';
       if (recvbuf[0] == 0 && recvbuf[1] == OPCODE_ACK) {
