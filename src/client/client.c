@@ -162,7 +162,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 		 block_number % 10}, 4*sizeof(char));
 	  log("Sending %d bytes to %s, server ephemeral port: %d\n", 
 	      addBufferPos, inet_ntoa(their_addr.sin_addr),
-	      their_addr.sin_port);
+	      ntohs(their_addr.sin_port));
 	  if ((numbytes = sendto(current_sockfd, sendbuf, addBufferPos, 0,
 	      (struct sockaddr *)&their_addr,
               sizeof(struct sockaddr))) == -1) {
@@ -221,7 +221,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	  log("Data to be sent (block %d): %s\n", block_number, &sendbuf[4]);
 	  log("Sending %d bytes to %s, server ephemeral port: %d\n", 
 	      addBufferPos, inet_ntoa(their_addr.sin_addr),
-	      their_addr.sin_port);
+	      ntohs(their_addr.sin_port));
 	  if ((numbytes = sendto(current_sockfd, sendbuf, addBufferPos, 0,
 	      (struct sockaddr *)&their_addr,
 	      sizeof(struct sockaddr))) == -1) {
