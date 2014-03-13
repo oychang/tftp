@@ -41,13 +41,9 @@ tftp_server(const int port)
         case SEND:
             log("sending packet\n");
             send_packet(current_sockfd, &client_addr, &session);
-	    log("Sending to %s:%d\n", inet_ntoa(client_addr.sin_addr),
-		ntohs(client_addr.sin_port));
             break;
         case SEND_RESET:
             send_packet(current_sockfd, &client_addr, &session);
-	    log("Sending to %s:%d\n", inet_ntoa(client_addr.sin_addr),
-		ntohs(client_addr.sin_port));
             reset_session(&session);
             close(current_sockfd);
             current_sockfd = well_known_sockfd;
