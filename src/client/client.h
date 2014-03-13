@@ -21,6 +21,7 @@
 #define OPCODE_WRQ 2
 #define OPCODE_DAT 3
 #define OPCODE_ACK 4
+#define OPCODE_ERR 5
 
 int tftp_client(int, int, char *, char *);
 

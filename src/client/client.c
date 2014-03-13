@@ -1,35 +1,62 @@
 #include "client.h"
-
+#define TIMEOUT_SEC 10
+//=============================================================================
 int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 
-  int default_sockfd;
-  int current_sockfd;
-  struct sockaddr_in their_addr;
-  struct sockaddr_in ephemeral;
-  struct hostent *he;
-  struct sockaddr_in my_addr;
-  unsigned int addr_len;
-  char sendbuf[MAXBUFLEN];
-  char recvbuf[MAXBUFLEN];
-  char mode[MAXMODELEN] = "octet";
-  int numbytes;
-  int wflag = (rflag ? 0 : 1);
-  int rqBufferPos = 0;
-  int addBufferPos = 4;
-  int loopcond = 1;
-  int first_packet;
-  int block_number;
-  FILE *ioFile;
-  char fileLine[MAXDATALEN];
+  int default_sockfd;              // Socket descriptor
+  int current_sockfd;              // Socket descriptor
+  struct sockaddr_in their_addr;   // Structure to hold server IP address
+  struct sockaddr_in ephemeral;    // Structure to hold ephemeral IP
+  struct sockaddr_in my_addr;      // Structure to hold client IP address
+  unsigned int addr_len;           // Designates length of IP addresses
+  struct hostent *he;              // Pointer to a host table entry
+  int yes = 1;
+  struct timeval timeout = {
+    .tv_sec = TIMEOUT_SEC,
+    .tv_usec = 0 };
+  char sendbuf[MAXBUFLEN];         // Buffer for sending packets
+  char recvbuf[MAXBUFLEN];         // Buffer for receiving packets
+  char mode[MAXMODELEN] = "octet"; // Mode variable; octet by default
+  int numbytes;                    // Number of bytes being sent
+  int wflag = (rflag ? 0 : 1);     // Initial packet: RRQ or WRQ?
+  int rqBufferPos = 0;             // Request Buffer Position
+  int addBufferPos = 4;            // Additional Buffer Position
+  int loopcond = 1;                // Condition signaling end of transfer
+  int first_packet;                // Needed for ephemeral port binding
+  int block_number;                // Current block # for ack or data
+  FILE *ioFile;                    // Local file to read or write from
+  char fileLine[MAXDATALEN];       // Input buffer from local file
 
+  // Get IP address from specified host name
   if ((he = gethostbyname(host_name)) == NULL) {
     perror("gethostbyname");
     exit(1);
   }
-
   if ((default_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
     perror("socket");
     exit(1);
+  }
+  log("Success in obtaining UDP sockfd %d\n", default_sockfd);
+  if (setsockopt(default_sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, 
+		 sizeof(int)) == -1) {
+    perror("setsockopt");
+    log("Continuing without port reuse\n");
+  } else {
+    log("Successfully set port reuse\n");
+  }
+  if (setsockopt(default_sockfd, SOL_SOCKET, SO_RCVTIMEO, (void*)&timeout,
+		 sizeof(struct timeval)) == -1) {
+    perror("setsockopt");
+    log("Continuing without receive timeout\n");
+  } else {
+    log("Successfully set receive timeout to %d seconds\n", TIMEOUT_SEC);
+  }
+  if (setsockopt(default_sockfd, SOL_SOCKET, SO_SNDTIMEO, (void*)&timeout,
+		 sizeof(struct timeval)) == -1) {
+    perror("setsockopt");
+    log("Continuing without send timeout\n");
+  } else {
+    log("Successfully set send timeout to %d seconds\n", TIMEOUT_SEC);
   }
   their_addr.sin_family = AF_INET;
   their_addr.sin_port = htons(port);
@@ -40,7 +67,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
     perror("bind");
     exit(1);
   }
-  
+  log("Successfully bound to default port!\n");
   current_sockfd = default_sockfd;
 
   // Pack and send the initial read/write request; establish connection
@@ -107,8 +134,30 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	  perror("socket");
 	  exit(1);
 	}
+	log("Success in obtaining UDP sockfd %d\n", default_sockfd);
+	if (setsockopt(current_sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, 
+		       sizeof(int)) == -1) {
+	  perror("setsockopt");
+	  log("Continuing without port reuse\n");
+	} else {
+	  log("Successfully set port reuse\n");
+	}
+	if (setsockopt(current_sockfd, SOL_SOCKET, SO_RCVTIMEO, 
+		       (void*)&timeout, sizeof(struct timeval)) == -1) {
+	  perror("setsockopt");
+	  log("Continuing without receive timeout\n");
+	} else {
+	  log("Successfully set receive timeout to %d seconds\n", TIMEOUT_SEC);
+	}
+	if (setsockopt(current_sockfd, SOL_SOCKET, SO_SNDTIMEO, 
+		       (void*)&timeout, sizeof(struct timeval)) == -1) {
+	  perror("setsockopt");
+	  log("Continuing without send timeout\n");
+	} else {
+	  log("Successfully set send timeout to %d seconds\n", TIMEOUT_SEC);
+	}
 	ephemeral.sin_family = AF_INET;
-	ephemeral.sin_port = htons(port);
+	ephemeral.sin_port = htons(0);
 	ephemeral.sin_addr = *((struct in_addr *)he->h_addr);
 	memset(&(ephemeral.sin_zero), '\0', 8);
 	if (bind(current_sockfd, (struct sockaddr *)&ephemeral, 
@@ -116,6 +165,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	  perror("bind");
 	  exit(1);
 	}
+	log("Successfully bound to ephemeral port!\n");
       }
 
       log("Got packet from %s, port %d\n",
@@ -174,8 +224,30 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	  perror("socket");
 	  exit(1);
 	}
+	log("Success in obtaining UDP sockfd %d\n", default_sockfd);
+	if (setsockopt(current_sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, 
+		       sizeof(int)) == -1) {
+	  perror("setsockopt");
+	  log("Continuing without port reuse\n");
+	} else {
+	  log("Successfully set port reuse\n");
+	}
+	if (setsockopt(current_sockfd, SOL_SOCKET, SO_RCVTIMEO, 
+		       (void*)&timeout, sizeof(struct timeval)) == -1) {
+	  perror("setsockopt");
+	  log("Continuing without receive timeout\n");
+	} else {
+	  log("Successfully set receive timeout to %d seconds\n", TIMEOUT_SEC);
+	}
+	if (setsockopt(current_sockfd, SOL_SOCKET, SO_SNDTIMEO, 
+		       (void*)&timeout, sizeof(struct timeval)) == -1) {
+	  perror("setsockopt");
+	  log("Continuing without send timeout\n");
+	} else {
+	  log("Successfully set send timeout to %d seconds\n", TIMEOUT_SEC);
+	}
 	ephemeral.sin_family = AF_INET;
-	ephemeral.sin_port = htons(port);
+	ephemeral.sin_port = htons(0);
 	ephemeral.sin_addr = *((struct in_addr *)he->h_addr);
 	memset(&(ephemeral.sin_zero), '\0', 8);
 	if (bind(current_sockfd, (struct sockaddr *)&ephemeral, 
@@ -183,6 +255,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	  perror("bind");
 	  exit(1);
 	}
+	log("Successfully bound to ephemeral port!\n");
       }
 
       log("Got packet from %s, port %d\n",
@@ -235,3 +308,4 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   close(current_sockfd);
   return 0;
 }
+//=============================================================================
