@@ -64,12 +64,16 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   my_addr.sin_port = htons(0);
   my_addr.sin_addr.s_addr = INADDR_ANY;
   memset(&(my_addr.sin_zero), '\0', 8);
+
+  /*
   if (bind(default_sockfd, (struct sockaddr *)&my_addr, 
       sizeof(struct sockaddr)) == -1) {
     perror("bind");
     exit(1);
   }
   log("Successfully bound to default port!\n");
+  */
+
   current_sockfd = default_sockfd;
 
   // Pack and send the initial read/write request; establish connection
@@ -123,6 +127,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
     block_number = 1;
     while (loopcond) {
       log("Calling for return packet from server...\n");
+      log("Listening on sockfd: %d\n", current_sockfd);
       log("Client address = %s, Client port = %d\n",
 	  inet_ntoa(my_addr.sin_addr), ntohs(my_addr.sin_port));
       addr_len = sizeof(struct sockaddr_in);
