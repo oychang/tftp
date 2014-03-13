@@ -1,5 +1,4 @@
 #include "client.h"
-#define TIMEOUT_SEC 10
 //=============================================================================
 int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 
@@ -139,7 +138,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
       }
 
       log("Got packet from %s, port %d\n",
-             inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
+             inet_ntoa(their_addr.sin_addr), their_addr.sin_port);
       log("Packet is %d bytes long\n", numbytes);
       recvbuf[numbytes] = '\0';
       if (numbytes < MAXBUFLEN) {
@@ -160,8 +159,9 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
           sendbuf[0] = '\0';
           memcpy(sendbuf, (char [4]){0, 4, block_number / 10, 
 		 block_number % 10}, 4*sizeof(char));
-	  log("Preparing to send %d bytes to %s\n", addBufferPos,
-	      inet_ntoa(their_addr.sin_addr));
+	  log("Sending %d bytes to %s, server ephemeral port: %d\n", 
+	      addBufferPos, inet_ntoa(their_addr.sin_addr),
+	      their_addr.sin_port);
 	  if ((numbytes = sendto(current_sockfd, sendbuf, addBufferPos, 0,
 	      (struct sockaddr *)&their_addr,
               sizeof(struct sockaddr))) == -1) {
@@ -196,7 +196,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
       }
 
       log("Got packet from %s, port %d\n",
-              inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
+              inet_ntoa(their_addr.sin_addr), their_addr.sin_port);
       log("Packet is %d bytes long\n", numbytes);
       recvbuf[numbytes] = '\0';
       if (recvbuf[0] == 0 && recvbuf[1] == OPCODE_ACK) {
@@ -217,8 +217,9 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	    log("Reached end of local data; preparing final data packet!\n");
 	  }
 	  log("Data to be sent (block %d): %s\n", block_number, &sendbuf[4]);
-	  log("Preparing to send %d bytes to %s\n", addBufferPos, 
-	      inet_ntoa(their_addr.sin_addr));
+	  log("Sending %d bytes to %s, server ephemeral port: %d\n", 
+	      addBufferPos, inet_ntoa(their_addr.sin_addr),
+	      their_addr.sin_port);
 	  if ((numbytes = sendto(current_sockfd, sendbuf, addBufferPos, 0,
 	      (struct sockaddr *)&their_addr,
 	      sizeof(struct sockaddr))) == -1) {

@@ -22,6 +22,7 @@
 #define OPCODE_DAT 3
 #define OPCODE_ACK 4
 #define OPCODE_ERR 5
+#define TIMEOUT_SEC 10
 
 int tftp_client(int, int, char *, char *);
 
