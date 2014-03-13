@@ -62,7 +62,11 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   their_addr.sin_port = htons(port);
   their_addr.sin_addr = *((struct in_addr *)he->h_addr);
   memset(&(their_addr.sin_zero), '\0', 8);
-  if (bind(default_sockfd, (struct sockaddr *)&their_addr, 
+  my_addr.sin_family = AF_INET;
+  my_addr.sin_port = htons(0);
+  my_addr.sin_addr.s_addr = INADDR_ANY;
+  memset(&(my_addr.sin_zero), '\0', 8);
+  if (bind(default_sockfd, (struct sockaddr *)&my_addr, 
       sizeof(struct sockaddr)) == -1) {
     perror("bind");
     exit(1);
@@ -107,11 +111,11 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
     perror("sendto");
     exit(1);
   }
-  log("Preparing to send %d bytes to %s\n", numbytes,
-	 inet_ntoa(their_addr.sin_addr));
+  log("Sending %d bytes to %s on server port %d\n", numbytes,
+      inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
   addr_len = sizeof(struct sockaddr_in);
   getsockname(current_sockfd, (struct sockaddr *)&my_addr, &addr_len);
-  log("Sent %d bytes from port %d\n", numbytes, ntohs(my_addr.sin_port));
+  log("Sent %d bytes via client port %d\n", numbytes, ntohs(my_addr.sin_port));
 
   //  printf("Sleeping for 5 seconds\n");
   //  sleep(5);
@@ -130,7 +134,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 
       if (first_packet) {
 	first_packet = 0;
-	if ((current_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+	/* if ((current_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 	  perror("socket");
 	  exit(1);
 	}
@@ -155,17 +159,17 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	  log("Continuing without send timeout\n");
 	} else {
 	  log("Successfully set send timeout to %d seconds\n", TIMEOUT_SEC);
-	}
-	ephemeral.sin_family = AF_INET;
-	ephemeral.sin_port = htons(0);
-	ephemeral.sin_addr = *((struct in_addr *)he->h_addr);
-	memset(&(ephemeral.sin_zero), '\0', 8);
-	if (bind(current_sockfd, (struct sockaddr *)&ephemeral, 
+	  } */
+	//ephemeral.sin_family = AF_INET;
+	their_addr.sin_port = ntohs(their_addr.sin_port);
+	//ephemeral.sin_addr = *((struct in_addr *)he->h_addr);
+	//memset(&(ephemeral.sin_zero), '\0', 8);
+	/* if (bind(current_sockfd, (struct sockaddr *)&ephemeral, 
 		 sizeof(struct sockaddr)) == -1) {
 	  perror("bind");
 	  exit(1);
 	}
-	log("Successfully bound to ephemeral port!\n");
+	log("Successfully bound to ephemeral port!\n"); */
       }
 
       log("Got packet from %s, port %d\n",
