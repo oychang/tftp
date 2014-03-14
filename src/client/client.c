@@ -157,6 +157,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
       numbytes = recvfrom(current_sockfd, recvbuf, MAXBUFLEN - 1, 0,
 			  (struct sockaddr *)&their_addr, &addr_len);
       while (numbytes == -1) {
+	log("Failed to receive packet from server; resending.\n");
 	if ((numbytes = sendto(current_sockfd, sendbuf, rqBufferPos, 0,
 			       (struct sockaddr *)&their_addr,
 			       sizeof(struct sockaddr))) == -1) {
