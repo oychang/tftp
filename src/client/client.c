@@ -81,7 +81,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   }
   log("Successfully bound to ephemeral port %d!\n", ntohs(my_addr.sin_port));
 
-  // current_sockfd = default_sockfd;
+  current_sockfd = default_sockfd;
 
   // Pack and send the initial read/write request; establish connection
   // If rflag is set, opcode 01; if wflag is set, opcode 02
@@ -136,6 +136,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   log("Sent %d bytes via client IP %s, client port %d\n", numbytes, 
       inet_ntoa(my_addr.sin_addr), ntohs(my_addr.sin_port));
 
+  /*
   // Create a socket and return its integer descriptor
   if ((current_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
     perror("socket");
@@ -173,6 +174,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
     exit(1);
   }
   log("Successfully bound to ephemeral port %d!\n", ntohs(my_addr.sin_port));
+  */
 
   // Handling of subsequent return packets depends on the initial specifier
   // If reading, then client receives data from server and sends back acks
