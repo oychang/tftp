@@ -67,10 +67,16 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   their_addr.sin_addr = *((struct in_addr *)he->h_addr);
   memset(&(their_addr.sin_zero), '\0', 8);
 
+  // Get IP address from specified host name
+  if ((he = gethostbyname("localhost")) == NULL) {
+    perror("gethostbyname");
+    exit(1);
+  }
+
   // Specify values for the structure specifying client's own address
   my_addr.sin_family = AF_INET;
   my_addr.sin_port = htons(0);
-  my_addr.sin_addr.s_addr = INADDR_ANY;
+  my_addr.sin_addr = *((struct in_addr *)he->h_addr);
   memset(&(my_addr.sin_zero), '\0', 8);
 
   // Bind to the client's ephemeral port, so packets can be received on it
@@ -195,7 +201,8 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
       numbytes = recvfrom(current_sockfd, recvbuf, MAXBUFLEN - 1, 0,
 			  (struct sockaddr *)&their_addr, &addr_len);
       while (numbytes == -1) {
-	log("Failed to receive packet from server; resending.\n");
+	log("Failed to receive packet from server; retrying.\n");
+	/*
 	if (first_packet) {
 	  if ((numbytes = sendto(current_sockfd, sendbuf, rqBufferPos, 0,
 				 (struct sockaddr *)&their_addr,
@@ -211,6 +218,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	    exit(1);
 	  }
 	}
+	*/
 	numbytes = recvfrom(current_sockfd, recvbuf, MAXBUFLEN - 1, 0,
 			    (struct sockaddr *)&their_addr, &addr_len);
       }	
