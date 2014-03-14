@@ -6,6 +6,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   int current_sockfd;              // Socket descriptor
   struct sockaddr_in their_addr;   // Structure to hold server IP address
   struct sockaddr_in my_addr;      // Structure to hold client IP address
+  struct sockaddr_in from_addr;
   unsigned int addr_len;           // Designates length of IP addresses
   struct hostent *he;              // Pointer to a host table entry
   int yes = 1;                     // Necessary for setting socket options
@@ -196,7 +197,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
       }
       */
       numbytes = recvfrom(current_sockfd, recvbuf, MAXBUFLEN - 1, 0,
-			  (struct sockaddr *)&their_addr, &addr_len);
+			  (struct sockaddr *)&from_addr, &addr_len);
       while (numbytes == -1) {
 	log("Failed to receive packet from server; retrying.\n");
 	/*
@@ -217,7 +218,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	}
 	*/
 	numbytes = recvfrom(current_sockfd, recvbuf, MAXBUFLEN - 1, 0,
-			    (struct sockaddr *)&their_addr, &addr_len);
+			    (struct sockaddr *)&from_addr, &addr_len);
       }	
 
       if (first_packet) {
