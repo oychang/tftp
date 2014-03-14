@@ -147,12 +147,26 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
       log("Client address = %s, Client port = %d\n",
 	  inet_ntoa(my_addr.sin_addr), ntohs(my_addr.sin_port));
       addr_len = sizeof(struct sockaddr_in);
+      /*
       if ((numbytes = recvfrom(current_sockfd, recvbuf, MAXBUFLEN - 1, 0,
 	  (struct sockaddr *)&their_addr, &addr_len)) == -1) {
 	perror("recvfrom");
         exit(1);
       }
-      
+      */
+      numbytes = recvfrom(current_sockfd, recvbuf, MAXBUFLEN - 1, 0,
+			  (struct sockaddr *)&their_addr, &addr_len);
+      while (numbytes == -1) {
+	if ((numbytes = sendto(current_sockfd, sendbuf, rqBufferPos, 0,
+			       (struct sockaddr *)&their_addr,
+			       sizeof(struct sockaddr))) == -1) {
+	  perror("sendto");
+	  exit(1);
+	}
+	numbytes = recvfrom(current_sockfd, recvbuf, MAXBUFLEN - 1, 0,
+			    (struct sockaddr *)&their_addr, &addr_len);
+      }	
+
       if (first_packet) {
 	first_packet = 0;
 	log("Server's default port is %d, but its ephemeral port is %d\n", 
