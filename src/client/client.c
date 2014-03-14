@@ -67,16 +67,10 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   their_addr.sin_addr = *((struct in_addr *)he->h_addr);
   memset(&(their_addr.sin_zero), '\0', 8);
 
-  // Get IP address from specified host name
-  if ((he = gethostbyname("localhost")) == NULL) {
-    perror("gethostbyname");
-    exit(1);
-  }
-
   // Specify values for the structure specifying client's own address
   my_addr.sin_family = AF_INET;
   my_addr.sin_port = htons(0);
-  my_addr.sin_addr = *((struct in_addr *)he->h_addr);
+  my_addr.sin_addr.s_addr = INADDR_ANY;
   memset(&(my_addr.sin_zero), '\0', 8);
 
   // Bind to the client's ephemeral port, so packets can be received on it
@@ -139,14 +133,15 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
       inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
   addr_len = sizeof(struct sockaddr_in);
   getsockname(default_sockfd, (struct sockaddr *)&my_addr, &addr_len);
-  log("Sent %d bytes via client port %d\n", numbytes, ntohs(my_addr.sin_port));
+  log("Sent %d bytes via client IP %s, client port %d\n", numbytes, 
+      inet_ntoa(my_addr.sin_addr), ntohs(my_addr.sin_port));
 
   // Create a socket and return its integer descriptor
   if ((current_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
     perror("socket");
     exit(1);
   }
-  log("Success in obtaining UDP sockfd %d\n", default_sockfd);
+  log("Success in obtaining UDP sockfd %d\n", current_sockfd);
 
   // Set socket options: port reusal, send/receive timeouts
   if (setsockopt(current_sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, 
