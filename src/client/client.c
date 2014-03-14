@@ -8,8 +8,8 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   struct sockaddr_in my_addr;      // Structure to hold client IP address
   unsigned int addr_len;           // Designates length of IP addresses
   struct hostent *he;              // Pointer to a host table entry
-  int yes = 1;
-  struct timeval timeout = {
+  int yes = 1;                     // Necessary for setting socket options
+  struct timeval timeout = {       // Necessary for setting socket options
     .tv_sec = TIMEOUT_SEC,
     .tv_usec = 0 };
   char sendbuf[MAXBUFLEN];         // Buffer for sending packets
@@ -30,11 +30,15 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
     perror("gethostbyname");
     exit(1);
   }
+
+  // Create a socket and return its integer descriptor
   if ((default_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
     perror("socket");
     exit(1);
   }
   log("Success in obtaining UDP sockfd %d\n", default_sockfd);
+
+  // Set socket options: port reusal, send/receive timeouts
   if (setsockopt(default_sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, 
 		 sizeof(int)) == -1) {
     perror("setsockopt");
@@ -56,35 +60,31 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   } else {
     log("Successfully set send timeout to %d seconds\n", TIMEOUT_SEC);
   }
+
+  // Specify values for the structure specifying the server address
   their_addr.sin_family = AF_INET;
   their_addr.sin_port = htons(port);
   their_addr.sin_addr = *((struct in_addr *)he->h_addr);
   memset(&(their_addr.sin_zero), '\0', 8);
+
+  // Specify values for the structure specifying client's own address
   my_addr.sin_family = AF_INET;
   my_addr.sin_port = htons(0);
   my_addr.sin_addr.s_addr = INADDR_ANY;
   memset(&(my_addr.sin_zero), '\0', 8);
 
-  /*
+  // Bind to the client's ephemeral port, so packets can be received on it
   if (bind(default_sockfd, (struct sockaddr *)&my_addr, 
       sizeof(struct sockaddr)) == -1) {
     perror("bind");
     exit(1);
   }
   log("Successfully bound to default port!\n");
-  */
-
-  if ((connect(default_sockfd, (struct sockaddr *)&their_addr,
-	      sizeof(their_addr))) < 0) {
-    perror("connect");
-    exit(1);
-  }
-  log("Connection to the socket established successfully!\n");
 
   current_sockfd = default_sockfd;
 
   // Pack and send the initial read/write request; establish connection
-  // if rflag is set, opcode 01; if wflag is set, opcode 02
+  // If rflag is set, opcode 01; if wflag is set, opcode 02
   if (rflag) {
     if ((ioFile = fopen(file_name, "w")) == NULL) {
       perror("opening local file for writing");
@@ -103,17 +103,26 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
     rqBufferPos += 2;
   }
 
-  // Add the target file name into the buffer
+  // Add the target file name into the request packet's buffer
   strcpy(&sendbuf[rqBufferPos], file_name);
   rqBufferPos += strlen(file_name);
   sendbuf[rqBufferPos] = '\0';
   rqBufferPos++;
 
-  strcpy(&sendbuf[rqBufferPos], mode);
-  rqBufferPos += strlen(mode);
-  sendbuf[rqBufferPos] = '\0';
-  rqBufferPos++;
+  // Add the mode into the request packet's buffer
+  // NOTE: the only mode supported is OCTET
+  if (strcmp(mode, "octet") != 0) {
+    log("Error: The only mode supported by this tftp program is 'octet'\n");
+    exit(1);
+  } else {
+    strcpy(&sendbuf[rqBufferPos], mode);
+    rqBufferPos += strlen(mode);
+    sendbuf[rqBufferPos] = '\0';
+    rqBufferPos++;
+  }
 
+  // Attempt to send the initial request packet off to the server
+  // If successful, print out details of the transmission (size, destination)
   if ((numbytes = sendto(current_sockfd, sendbuf, rqBufferPos, 0,
 			 (struct sockaddr *)&their_addr,
 			 sizeof(struct sockaddr))) == -1) {
@@ -126,9 +135,9 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   getsockname(current_sockfd, (struct sockaddr *)&my_addr, &addr_len);
   log("Sent %d bytes via client port %d\n", numbytes, ntohs(my_addr.sin_port));
 
-  //  printf("Sleeping for 5 seconds\n");
-  //  sleep(5);
-
+  // Handling of subsequent return packets depends on the initial specifier
+  // If reading, then client receives data from server and sends back acks
+  // If writing, then client receives acks from server and sends back data
   if (rflag) {
     first_packet = 1;
     block_number = 1;
@@ -143,13 +152,13 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	perror("recvfrom");
         exit(1);
       }
-      /*
+      
       if (first_packet) {
 	first_packet = 0;
 	log("Server's default port is %d, but its ephemeral port is %d\n", 
 	    port, ntohs(their_addr.sin_port));
       }
-      */
+      
       log("Got packet from %s, port %d\n",
 	  inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
       log("Packet is %d bytes long\n", numbytes);
@@ -322,16 +331,25 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 	  }
 	}
       } else {
+	// Opcode not recognized: not data, ack, or error packet
+	// Opcode may also have been RRQ or WRQ, which client can't process
 	log("Opcode Mismatch... Expecting ack packets; ignoring packet\n");
       }
     }
   }
+
+  // Close the local file which the program has been using for read/write
   if (fclose(ioFile) == EOF) {
     perror("closing local file");
     exit(1);
   }
+
+  // End communication with server; the loop condition is no longer satisfied
+  // This can be due to: (1) completed data transfer, or (2) error
   log("Terminating communication; closing communication channel!\n");
   close(current_sockfd);
+  
+  // Reached the end of the program; exit with a successful return value
   return 0;
 }
 //=============================================================================
