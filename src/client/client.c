@@ -174,6 +174,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
         perror("sendto");
         exit(1);
       }
+      block_number++;
     } else if (!rflag && recvbuf[0] == 0 && recvbuf[1] == OPCODE_ACK) {
       if (block_number != recvBlockNum) {
         log("Ack for block %d was already received; ignoring packet\n",
