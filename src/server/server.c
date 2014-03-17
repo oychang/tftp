@@ -29,8 +29,8 @@ tftp_server(const int port)
         // Check for proper TID (i.e. that port matches up to what we expect)
         if (session.status == IDLE && session.recvbytes > 0) {
             log("initial connection...assigning ports\n");
-            session.client_tid = ntohs(client_addr.sin_port);
-            log("client sends packets from %d\n", session.client_tid);
+            log("client sends packets from %d\n",
+                ntohs(client_addr.sin_port));
             current_sockfd = get_bound_sockfd(0, &ephemeral_addr);
         }
 
@@ -292,7 +292,6 @@ reset_session(session_t * session)
 
     session->status = IDLE;
     session->block_n = 0;
-    session->client_tid = -1;
     session->fn[0] = '\0';
     if (session->file != NULL) {
         fclose(session->file);
