@@ -141,6 +141,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
     // After the first packet, send packets to the server's chosen
     // ephemeral port.
     if (their_addr.sin_port == htons(port)) {
+      log("changing their addr port\n");
       their_addr.sin_port = from_addr.sin_port;
     }
 

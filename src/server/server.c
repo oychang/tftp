@@ -420,7 +420,7 @@ send_packet(int sockfd, struct sockaddr_in * fromaddr, session_t * session)
             session->sendbytes, sent_bytes);
         log("sent from %s:%d to port %u\n",
             inet_ntoa(addr.sin_addr), ntohs(addr.sin_port),
-            session->client_tid);
+            ntohs(fromaddr->sin_port));
         log("=========================\n");
     }
 
