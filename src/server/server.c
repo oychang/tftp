@@ -22,7 +22,6 @@ tftp_server(const int port)
     // (2) if session is active, listen on the ephemeral session port for
     // a singular TID (i.e. only respond to things on one port, ostensibly
     // from the same client)
-    log("entering main program loop\n");
     enum response_action act = SEND;
     // If LOOP_FOREVER set to true in header file, will continue indefinitely.
     while (act == SEND || act == NOOP || LOOP_FOREVER) {
@@ -32,14 +31,12 @@ tftp_server(const int port)
             log("initial connection...assigning ports\n");
             session.client_tid = ntohs(client_addr.sin_port);
             log("client sends packets from %d\n", session.client_tid);
-            log("obtaining ephemeral port\n");
             current_sockfd = get_bound_sockfd(0, &ephemeral_addr);
         }
 
         // Parse packet and prepare response
         switch ((act = parse_packet(&session))) {
         case SEND:
-            log("sending packet\n");
             send_packet(current_sockfd, &client_addr, &session);
             break;
         case SEND_RESET:
@@ -59,7 +56,6 @@ tftp_server(const int port)
         }
     }
 
-    log("closing down program\n");
     return EXIT_SUCCESS;
 }
 //=============================================================================
@@ -69,6 +65,7 @@ parse_packet(session_t * session)
     // Do a basic check for opcode validity
     if (session->recvbytes == -1) {
         if (session->status != IDLE) {
+            // TODO: retransmission limit
             log("no response...retransmitting\n");
             return SEND;
         } else {
@@ -103,11 +100,9 @@ parse_request_packet(session_t * session, int is_read)
     // Opcode + 1 Char filename + \0 + 1 Char mode + \0
     static const int min_req_length = 2 + 1 + 1 + 1 + 1;
     if (session->status != IDLE) {
-        log("transfer in progress\n");
         prepare_error_packet(session, 5, "only one transfer at a time");
         return SEND;
     } else if (session->recvbytes < min_req_length) {
-        log("aborting: request packet too short\n");
         prepare_error_packet(session, 0, "request too short");
         return SEND_RESET;
     }
@@ -126,7 +121,6 @@ parse_request_packet(session_t * session, int is_read)
     static const char * octet = "octet";
     const size_t octet_len = strlen(octet);
     if (strncasecmp(&session->recvbuf[2+filename_len+1], octet, octet_len)) {
-        log("aborting: only octet mode supported\n");
         prepare_error_packet(session, 0, "only octet supported");
         return SEND_RESET;
     }
@@ -138,12 +132,10 @@ parse_request_packet(session_t * session, int is_read)
     struct stat statbuf;
     int statret = stat(session->fn, &statbuf);
     if (strstr(session->fn, "..") != NULL || session->fn[0] == '/') {
-        log("terminating: found up traversal\n");
         prepare_error_packet(session, 2, "no up traversal");
         return SEND_RESET;
     } else if (!statret) {
         if (is_read && (statbuf.st_mode & UGOR) != UGOR) {
-            log("terminating: file not readable by all\n");
             prepare_error_packet(session, 2, "bad read permissions");
             return SEND_RESET;
         } else {
@@ -175,12 +167,10 @@ parse_data_packet(session_t * session)
     static const int min_data_len = 2 + 2 + 0; // can get 0 bytes
     static const int max_data_len = 2 + 2 + 512;
     if (session->status != WRITE) {
-        log("no request or we are sender...data meaningless\n");
         prepare_error_packet(session, 4, "send WRQ before data");
         return SEND_RESET;
     } else if (session->recvbytes > max_data_len
         || session->recvbytes < min_data_len) {
-        log("data packet size is wrong\n");
         prepare_error_packet(session, 0, "bad data packet size");
         return SEND_RESET;
     }
@@ -353,26 +343,23 @@ set_socket_options(int sockfd)
         .tv_sec = TIMEOUT_SEC, .tv_usec = 0
     };
 
+    log("timeout length is %d seconds\n", TIMEOUT_SEC);
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int))
         == -1) {
         perror("setsockopt");
         log("continuing without port reuse\n");
-    } else {
-        log("successfully set port reuse\n");
     }
+
     if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO,
         (void*)&timeout, sizeof(struct timeval)) == -1) {
         perror("setsockopt");
         log("continuing without receive timeout\n");
-    } else {
-        log("successfully set receive timeout to %d seconds\n", TIMEOUT_SEC);
     }
+
     if (setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO,
         (void*)&timeout, sizeof(struct timeval)) == -1) {
         perror("setsockopt");
         log("continuing without send timeout\n");
-    } else {
-        log("successfully set send timeout to %d seconds\n", TIMEOUT_SEC);
     }
 
     return;
