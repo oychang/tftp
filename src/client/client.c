@@ -14,7 +14,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   static const char * mode = "octet";
   char sendbuf[MAXBUFLEN];         // Buffer for sending packets
   char recvbuf[MAXBUFLEN];         // Buffer for receiving packets
-  int numbytes = -1;                    // Number of bytes being sent
+  int numbytes = -1;               // Number of bytes being sent
   int rqBufferPos = 0;
   int addBufferPos = 4;
   int block_number;                // Current block # for ack or data
@@ -82,7 +82,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   // If rflag is set, opcode 01; if wflag is set, opcode 02
   if (rflag) {
     if ((ioFile = fopen(file_name, "w")) == NULL) {
-      perror("opening local file for writing");
+      perror("fopen");
       exit(1);
     }
     log("Preparing read request packet!\n");
@@ -90,7 +90,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
     rqBufferPos += 2;
   } else {
     if ((ioFile = fopen(file_name, "r")) == NULL) {
-      perror("opening local file for reading");
+      perror("fopen");
       exit(1);
     }
     log("Preparing write request packet!\n");
@@ -237,7 +237,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   }
 
   if (fclose(ioFile) == EOF) {
-    perror("closing local file");
+    perror("fclose");
     exit(1);
   }
 
