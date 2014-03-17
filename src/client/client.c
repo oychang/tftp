@@ -3,10 +3,10 @@
 int tftp_client(const int PORT, const int rflag, char *file_name,
   char *host_name) {
   int sockfd;
-  struct sockaddr_in their_addr;   // Structure to hold server IP address
-  struct sockaddr_in my_addr;      // Structure to hold client IP address
-  struct sockaddr_in from_addr;
-  unsigned int addr_len;           // Designates length of IP addresses
+  struct sockaddr_in myaddr;
+  struct sockaddr_in serveraddr;
+  struct sockaddr_in recvaddr;
+  unsigned int addrLen;            // Designates length of IP addresses
   struct hostent *he;              // Pointer to a host table entry
   static const int yes = 1;        // Necessary for setting socket options
   static const struct timeval timeout = {.tv_sec = TIMEOUT_SEC, .tv_usec = 0 };
@@ -16,7 +16,7 @@ int tftp_client(const int PORT, const int rflag, char *file_name,
   int numbytes = -1;               // Number of bytes being sent
   int rqBufferPos = 0;
   int addBufferPos = 4;
-  int block_number;                // Current block # for ack or data
+  int blockNumber;                 // Current block # for ack or data
   FILE *ioFile;                    // Local file to read or write from
 
   // Get IP address from specified host name
@@ -56,24 +56,24 @@ int tftp_client(const int PORT, const int rflag, char *file_name,
   }
 
   // Specify values for the structure specifying the server address
-  their_addr.sin_family = AF_INET;
-  their_addr.sin_port = htons(port);
-  their_addr.sin_addr = *((struct in_addr *)he->h_addr);
-  memset(&(their_addr.sin_zero), '\0', 8);
+  serveraddr.sin_family = AF_INET;
+  serveraddr.sin_port = htons(PORT);
+  serveraddr.sin_addr = *((struct in_addr *)he->h_addr);
+  memset(&(serveraddr.sin_zero), '\0', 8);
 
   // Specify values for the structure specifying client's own address
-  my_addr.sin_family = AF_INET;
-  my_addr.sin_port = htons(0);
-  my_addr.sin_addr.s_addr = INADDR_ANY;
-  memset(&(my_addr.sin_zero), '\0', 8);
+  myaddr.sin_family = AF_INET;
+  myaddr.sin_port = htons(0);
+  myaddr.sin_addr.s_addr = INADDR_ANY;
+  memset(&(myaddr.sin_zero), '\0', 8);
 
   // Bind to the client's ephemeral port, so packets can be received on it
-  if (bind(sockfd, (struct sockaddr *)&my_addr,
+  if (bind(sockfd, (struct sockaddr *)&myaddr,
       sizeof(struct sockaddr)) == -1) {
     perror("bind");
     exit(1);
   }
-  log("Successfully bound to ephemeral port %d!\n", ntohs(my_addr.sin_port));
+  log("Successfully bound to ephemeral port %d!\n", ntohs(myaddr.sin_port));
 
   // Pack and send the initial read/write request; establish connection
   // If rflag is set, opcode 01; if wflag is set, opcode 02
@@ -105,39 +105,40 @@ int tftp_client(const int PORT, const int rflag, char *file_name,
   // Attempt to send the initial request packet off to the server
   // If successful, print out details of the transmission (size, destination)
   if ((numbytes = sendto(sockfd, sendbuf, rqBufferPos, 0,
-       (struct sockaddr *)&their_addr, sizeof(struct sockaddr))) == -1) {
+       (struct sockaddr *)&serveraddr, sizeof(struct sockaddr))) == -1) {
     perror("sendto");
     exit(1);
   }
   log("Sending %d bytes to %s, server default port: %d\n", numbytes,
-      inet_ntoa(their_addr.sin_addr), ntohs(their_addr.sin_port));
-  addr_len = sizeof(struct sockaddr_in);
-  getsockname(sockfd, (struct sockaddr *)&my_addr, &addr_len);
+      inet_ntoa(serveraddr.sin_addr), ntohs(serveraddr.sin_port));
+  addrLen = sizeof(struct sockaddr_in);
+  getsockname(sockfd, (struct sockaddr *)&myaddr, &addrLen);
   log("Sent %d bytes via client IP %s, client port %d\n", numbytes,
-      inet_ntoa(my_addr.sin_addr), ntohs(my_addr.sin_port));
+      inet_ntoa(myaddr.sin_addr), ntohs(myaddr.sin_port));
 
   // Receive at the top of this loop, send at end
-  block_number = rflag ? 1 : 0;
+  blockNumber = rflag ? 1 : 0;
   while (true) {
-    addr_len = sizeof(struct sockaddr);
+    log("Waiting for packet\n");
+    addrLen = sizeof(struct sockaddr);
     numbytes = recvfrom(sockfd, recvbuf, MAXBUFLEN - 1, 0,
-      (struct sockaddr *)&from_addr, &addr_len);
+      (struct sockaddr *)&recvaddr, &addrLen);
     while (numbytes == -1) {
       log("Failed to receive packet from server; retrying.\n");
-      addr_len = sizeof(struct sockaddr);
+      addrLen = sizeof(struct sockaddr);
       numbytes = recvfrom(sockfd, recvbuf, MAXBUFLEN - 1, 0,
-        (struct sockaddr *)&from_addr, &addr_len);
+        (struct sockaddr *)&recvaddr, &addrLen);
     }
 
     log("Got packet from %s, port %d\n",
-      inet_ntoa(from_addr.sin_addr), ntohs(from_addr.sin_port));
+      inet_ntoa(recvaddr.sin_addr), ntohs(recvaddr.sin_port));
     log("Packet is %d bytes long\n", numbytes);
 
     // After the first packet, send packets to the server's chosen
     // ephemeral port.
-    if (their_addr.sin_port == htons(port)) {
+    if (serveraddr.sin_port == htons(PORT)) {
       log("changing their addr port\n");
-      their_addr.sin_port = from_addr.sin_port;
+      serveraddr.sin_port = recvaddr.sin_port;
     }
 
     recvbuf[numbytes] = '\0';
@@ -147,7 +148,7 @@ int tftp_client(const int PORT, const int rflag, char *file_name,
     // Parse data packet, send response ack packet
     if (rflag && recvbuf[0] == 0 && recvbuf[1] == OPCODE_DAT) {
       // Check if right block number
-      if (block_number != recvBlockNum) {
+      if (blockNumber != recvBlockNum) {
         log("Data for block was already received; ignoring packet\n");
         continue;
       }
@@ -163,46 +164,46 @@ int tftp_client(const int PORT, const int rflag, char *file_name,
       // Construct an acknowledgement packet and send back
       memcpy(sendbuf, (char [4]){
         0, OPCODE_ACK,
-        GET_HOB(block_number), GET_LOB(block_number)
+        GET_HOB(blockNumber), GET_LOB(blockNumber)
       }, 4*sizeof(char));
 
       // Check if done
       if (numbytes < 516) {
         log("Got incomplete data packet so done with transfer after ack\n");
         sendto(sockfd, sendbuf, addBufferPos, 0,
-          (struct sockaddr *)&their_addr, sizeof(struct sockaddr));
+          (struct sockaddr *)&serveraddr, sizeof(struct sockaddr));
         break;
       }
 
       if ((numbytes = sendto(sockfd, sendbuf, addBufferPos, 0,
-        (struct sockaddr *)&their_addr, sizeof(struct sockaddr))) == -1) {
+        (struct sockaddr *)&serveraddr, sizeof(struct sockaddr))) == -1) {
         // XXX: sloppy, preventable death here
         perror("sendto");
         exit(1);
       }
-      block_number++;
+      blockNumber++;
 
     // Parse ack packet, send response data packet
     } else if (!rflag && recvbuf[0] == 0 && recvbuf[1] == OPCODE_ACK) {
-      if (block_number != recvBlockNum) {
+      if (blockNumber != recvBlockNum) {
         log("Ack for block %d was already received; ignoring packet\n",
-          block_number);
+          blockNumber);
         continue;
       }
 
-      log("Received ack for block# %d\n", block_number);
-      block_number++;
+      log("Received ack for block# %d\n", blockNumber);
+      blockNumber++;
 
       memcpy(sendbuf, (char [4]){
         0, OPCODE_DAT,
-        GET_HOB(block_number), GET_LOB(block_number)
+        GET_HOB(blockNumber), GET_LOB(blockNumber)
       }, 4*sizeof(char));
       addBufferPos = 4;
       // Add the data to the packet
       addBufferPos += fread(&sendbuf[4], sizeof(char), 512, ioFile);
 
       if ((numbytes = sendto(sockfd, sendbuf, addBufferPos, 0,
-        (struct sockaddr *)&their_addr, sizeof(struct sockaddr))) == -1) {
+        (struct sockaddr *)&serveraddr, sizeof(struct sockaddr))) == -1) {
         // XXX: sloppy, preventable death
         perror("sendto");
         exit(1);

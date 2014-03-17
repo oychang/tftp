@@ -27,6 +27,6 @@
 #define GET_HOB(n) ((n) >> 8)
 #define GET_LOB(n) ((n) & 0xff)
 
-int tftp_client(const int, int, char *, char *);
+int tftp_client(const int, const int, char *, char *);
 
 #endif
