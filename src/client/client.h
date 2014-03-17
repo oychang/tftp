@@ -12,8 +12,8 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include "../Logging.h"
+#include "../Boolean.h"
 
-#define MYPORT 3335
 #define MAXBUFLEN 516
 #define MAXDATALEN 512
 #define MAXMODELEN 8
