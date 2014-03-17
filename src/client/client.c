@@ -165,7 +165,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 
       // Construct an acknowledgement packet and send back
       memcpy(sendbuf, (char [4]){
-        0, 4,
+        0, OPCODE_ACK,
         GET_HOB(block_number), GET_LOB(block_number)
       }, 4*sizeof(char));
       if ((numbytes = sendto(current_sockfd, sendbuf, addBufferPos, 0,
