@@ -388,7 +388,7 @@ packet_listener(int sockfd, session_t * session, struct sockaddr_in * fromaddr)
 
     if (VERBOSE) {
         log("received %zd bytes\n", session->recvbytes);
-        if (session->recvbytes == -1 && errno != ETIMEDOUT)
+        if (session->recvbytes == -1 && errno != EAGAIN)
             perror("recvfrom");
         else
             log("packet originated from %s:%d\n",
