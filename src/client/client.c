@@ -143,7 +143,6 @@ int tftp_client(const int PORT, const int rflag, char *file_name,
 
     recvbuf[numbytes] = '\0';
     int recvBlockNum = (recvbuf[2] << 8) + recvbuf[3];
-    log("Received data with block# %d\n", recvBlockNum);
 
     // Parse data packet, send response ack packet
     if (rflag && recvbuf[0] == 0 && recvbuf[1] == OPCODE_DAT) {
@@ -152,6 +151,8 @@ int tftp_client(const int PORT, const int rflag, char *file_name,
         log("Data for block was already received; ignoring packet\n");
         continue;
       }
+
+      log("Received data for block# %d\n", recvBlockNum);
 
       if (fputs(&recvbuf[4], ioFile) != EOF) {
         log("Successfully wrote newly received data to local file!\n");
