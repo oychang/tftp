@@ -146,7 +146,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
 
     recvbuf[numbytes] = '\0';
     int recvBlockNum = (recvbuf[2] << 8) + recvbuf[3];
-    log("Received data with block# %d\n", block_number);
+    log("Received data with block# %d\n", recvBlockNum);
 
     if (rflag && recvbuf[0] == 0 && recvbuf[1] == OPCODE_DAT) {
       // Check if right block number
