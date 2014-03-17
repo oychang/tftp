@@ -1,7 +1,7 @@
 #include "client.h"
 //=============================================================================
-int tftp_client(int port, int rflag, char *file_name, char *host_name) {
-
+int tftp_client(const int PORT, const int rflag, char *file_name,
+  char *host_name) {
   int sockfd;
   struct sockaddr_in their_addr;   // Structure to hold server IP address
   struct sockaddr_in my_addr;      // Structure to hold client IP address
