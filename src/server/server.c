@@ -388,9 +388,10 @@ packet_listener(int sockfd, session_t * session, struct sockaddr_in * fromaddr)
 
     if (VERBOSE) {
         log("received %zd bytes\n", session->recvbytes);
-        if (session->recvbytes == -1 && errno != EAGAIN)
-            perror("recvfrom");
-        else
+        if (session->recvbytes == -1) {
+            if (errno != EAGAIN)
+                perror("recvfrom");
+        } else
             log("packet originated from %s:%d\n",
                 inet_ntoa(fromaddr->sin_addr), ntohs(fromaddr->sin_port));
     }
