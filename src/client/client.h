@@ -24,6 +24,9 @@
 #define OPCODE_ERR 5
 #define TIMEOUT_SEC 10
 
+#define GET_HOB(n) (n >> 8)
+#define GET_LOB(n) (n & 0xff)
+
 int tftp_client(int, int, char *, char *);
 
 #endif

@@ -123,8 +123,6 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
   block_number = rflag ? 1 : 0;
   while (true) {
     log("Listening on sockfd: %d\n", current_sockfd);
-    log("Client address = %s, Client port = %d\n", inet_ntoa(my_addr.sin_addr),
-      ntohs(my_addr.sin_port));
 
     addr_len = sizeof(struct sockaddr);
     numbytes = recvfrom(current_sockfd, recvbuf, MAXBUFLEN - 1, 0,
@@ -160,17 +158,19 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
       if (fputs(&recvbuf[4], ioFile) != EOF) {
         log("Successfully wrote newly received data to local file!\n");
       } else {
-        // TODO: prepare error packet
+        // XXX: prepare error packet
         log("write to local file");
         exit(1);
       }
 
       // Construct an acknowledgement packet and send back
-      // TODO: properly create ack here
-      memcpy(sendbuf, (char [4]){0, 4, 0, 0}, 4*sizeof(char));
+      memcpy(sendbuf, (char [4]){
+        0, 4,
+        GET_HOB(block_number), GET_LOB(block_number)
+      }, 4*sizeof(char));
       if ((numbytes = sendto(current_sockfd, sendbuf, addBufferPos, 0,
         (struct sockaddr *)&their_addr, sizeof(struct sockaddr))) == -1) {
-        // TODO: sloppy, preventable death here
+        // XXX: sloppy, preventable death here
         perror("sendto");
         exit(1);
       }
@@ -184,15 +184,17 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
       log("Received ack for block# %d\n", block_number);
       block_number++;
 
-      // TODO: properly generate
-      memcpy(sendbuf, (char [4]){0, OPCODE_DAT, 0, 0}, 4*sizeof(char));
+      memcpy(sendbuf, (char [4]){
+        0, OPCODE_DAT,
+        GET_HOB(block_number), GET_LOB(block_number)
+      }, 4*sizeof(char));
       addBufferPos = 4;
       // Add the data to the packet
       addBufferPos += fread(&sendbuf[4], sizeof(char), 512, ioFile);
 
       if ((numbytes = sendto(current_sockfd, sendbuf, addBufferPos, 0,
         (struct sockaddr *)&their_addr, sizeof(struct sockaddr))) == -1) {
-        // TODO: sloppy, preventable death
+        // XXX: sloppy, preventable death
         perror("sendto");
         exit(1);
       }
@@ -202,7 +204,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
         break;
       }
     } else if (recvbuf[0] == 0 && recvbuf[1] == OPCODE_ERR) {
-      // TODO: perhaps print these to stderr regardless of verbosity
+      // XXX: perhaps print these to stderr regardless of verbosity
       switch (recvBlockNum) {
       case 0:
         log("Error Code 0: Not defined, see error message (if any)\n");
