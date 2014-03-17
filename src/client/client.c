@@ -164,17 +164,20 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
         exit(1);
       }
 
-      // Check if done
-      if (numbytes < 516) {
-        log("Got incomplete data packet so done with transfer\n");
-        break;
-      }
-
       // Construct an acknowledgement packet and send back
       memcpy(sendbuf, (char [4]){
         0, OPCODE_ACK,
         GET_HOB(block_number), GET_LOB(block_number)
       }, 4*sizeof(char));
+
+      // Check if done
+      if (numbytes < 516) {
+        log("Got incomplete data packet so done with transfer after ack\n");
+        sendto(current_sockfd, sendbuf, addBufferPos, 0,
+          (struct sockaddr *)&their_addr, sizeof(struct sockaddr));
+        break;
+      }
+
       if ((numbytes = sendto(current_sockfd, sendbuf, addBufferPos, 0,
         (struct sockaddr *)&their_addr, sizeof(struct sockaddr))) == -1) {
         // XXX: sloppy, preventable death here
