@@ -7,7 +7,6 @@ int tftp_client(const int PORT, const int rflag, char *file_name,
   struct sockaddr_in serveraddr;
   struct sockaddr_in recvaddr;
   unsigned int addrLen;            // Designates length of IP addresses
-  struct hostent *he;              // Pointer to a host table entry
   static const int yes = 1;        // Necessary for setting socket options
   static const struct timeval timeout = {.tv_sec = TIMEOUT_SEC, .tv_usec = 0 };
   static const char * mode = "octet";
@@ -18,12 +17,6 @@ int tftp_client(const int PORT, const int rflag, char *file_name,
   int addBufferPos = 4;
   int blockNumber;                 // Current block # for ack or data
   FILE *ioFile;                    // Local file to read or write from
-
-  // Get IP address from specified host name
-  if ((he = gethostbyname(host_name)) == NULL) {
-    perror("gethostbyname");
-    exit(1);
-  }
 
   // Create a socket and return its integer descriptor
   if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
@@ -58,7 +51,7 @@ int tftp_client(const int PORT, const int rflag, char *file_name,
   // Specify values for the structure specifying the server address
   serveraddr.sin_family = AF_INET;
   serveraddr.sin_port = htons(PORT);
-  serveraddr.sin_addr = *((struct in_addr *)he->h_addr);
+  inet_pton(AF_INET, host_name, &serveraddr.sin_addr);
   memset(&(serveraddr.sin_zero), '\0', 8);
 
   // Specify values for the structure specifying client's own address
