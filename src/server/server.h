@@ -41,9 +41,6 @@ int get_udp_sockfd(void);
 // Sets various operations on the socket with `setsockopt`.
 // Sets port reuse, send/receive timeouts to macro TIMEOUT_SEC.
 void set_socket_options(int sockfd);
-// Sets up a sockaddr_in to listen on the port given with IP and to any
-// network interface the device has with INADDR_ANY.
-void setup_my_sin(struct sockaddr_in * sin, int port);
 
 // Wrapper around recvfrom() setup and logging. Blocks until data or timeout.
 // Listens for up to MAX_BUFFER_LEN - 1 bytes of data.

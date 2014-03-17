@@ -299,14 +299,20 @@ reset_session(session_t * session)
 int
 get_bound_sockfd(const int port)
 {
-    struct sockaddr_in sin;
 
     int sockfd = get_udp_sockfd();
     if (sockfd == EXIT_FAILURE)
         return EXIT_FAILURE;
 
     set_socket_options(sockfd);
-    setup_my_sin(&sin, port);
+    log("setting port to %d\n", port);
+
+    struct sockaddr_in sin = {
+        .sin_family = AF_INET,
+        .sin_port = htons(port),
+        .sin_addr.s_addr = INADDR_ANY,
+        .sin_zero = {0,0,0,0,0,0,0,0} // 8 zeros
+    };
     if (bind(sockfd, (struct sockaddr *)&sin, sizeof(struct sockaddr)) == -1) {
         perror("bind");
         return EXIT_FAILURE;
@@ -356,19 +362,6 @@ set_socket_options(int sockfd)
         perror("setsockopt");
         log("continuing without send timeout\n");
     }
-
-    return;
-}
-//-----------------------------------------------------------------------------
-void
-setup_my_sin(struct sockaddr_in * sin, int port)
-{
-    log("setting port to %d\n", port);
-
-    sin->sin_family = AF_INET;
-    sin->sin_port = htons(port);
-    sin->sin_addr.s_addr = INADDR_ANY;
-    memset(&(sin->sin_zero), '\0', 8);
 
     return;
 }
