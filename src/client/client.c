@@ -164,6 +164,12 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
         exit(1);
       }
 
+      // Check if done
+      if (numbytes < 516) {
+        log("Got incomplete data packet so done with transfer\n");
+        break;
+      }
+
       // Construct an acknowledgement packet and send back
       memcpy(sendbuf, (char [4]){
         0, OPCODE_ACK,
