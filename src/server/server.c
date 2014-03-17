@@ -51,7 +51,6 @@ tftp_server(const int port)
             current_sockfd = well_known_sockfd;
             break;
         case NOOP: default:
-            log("ignoring this packet\n");
             break;
         }
     }
@@ -139,7 +138,7 @@ parse_request_packet(session_t * session, int is_read)
             prepare_error_packet(session, 2, "bad read permissions");
             return SEND_RESET;
         } else {
-            log("file already exists on this machine...about to overwrite\n");
+            log("warn: file exists on this machine; overwrite possible\n");
         }
     }
 
@@ -381,7 +380,7 @@ setup_my_sin(struct sockaddr_in * sin, int port)
 void
 packet_listener(int sockfd, session_t * session, struct sockaddr_in * fromaddr)
 {
-    log("listening for new packet on sockfd %d\n", sockfd);
+    // log("listening for new packet on sockfd %d\n", sockfd);
     // XXX: We discard and do not check this value
     socklen_t fromaddr_len = sizeof(struct sockaddr);
     session->recvbytes = recvfrom(sockfd, session->recvbuf,
@@ -389,12 +388,11 @@ packet_listener(int sockfd, session_t * session, struct sockaddr_in * fromaddr)
 
     if (VERBOSE) {
         log("received %zd bytes\n", session->recvbytes);
-        if (session->recvbytes == -1)
+        if (session->recvbytes == -1 && errno != ETIMEDOUT)
             perror("recvfrom");
-        else {
+        else
             log("packet originated from %s:%d\n",
                 inet_ntoa(fromaddr->sin_addr), ntohs(fromaddr->sin_port));
-        }
     }
 
     return;
