@@ -413,14 +413,10 @@ send_packet(int sockfd, struct sockaddr_in * fromaddr, session_t * session)
         }
         printf("\n");
 
-        struct sockaddr_in addr;
-        socklen_t socklen = sizeof(struct sockaddr);
-        getsockname(sockfd, (struct sockaddr *)&addr, &socklen);
         log("wanted to send %zd bytes; actually sent %zd bytes\n",
             session->sendbytes, sent_bytes);
-        log("sent from %s:%d to port %u\n",
-            inet_ntoa(addr.sin_addr), ntohs(addr.sin_port),
-            ntohs(fromaddr->sin_port));
+        log("sent to %s:%d\n",
+            inet_ntoa(fromaddr->sin_addr), ntohs(fromaddr->sin_port));
         log("=========================\n");
     }
 
