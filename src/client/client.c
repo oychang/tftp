@@ -148,6 +148,7 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
     int recvBlockNum = (recvbuf[2] << 8) + recvbuf[3];
     log("Received data with block# %d\n", recvBlockNum);
 
+    // Parse data packet, send response ack packet
     if (rflag && recvbuf[0] == 0 && recvbuf[1] == OPCODE_DAT) {
       // Check if right block number
       if (block_number != recvBlockNum) {
@@ -175,6 +176,8 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
         exit(1);
       }
       block_number++;
+
+    // Parse ack packet, send response data packet
     } else if (!rflag && recvbuf[0] == 0 && recvbuf[1] == OPCODE_ACK) {
       if (block_number != recvBlockNum) {
         log("Ack for block %d was already received; ignoring packet\n",
@@ -201,11 +204,13 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
       }
 
       if (numbytes < 516) {
-        log("Got incomplete data packet so done with transfer");
+        log("Sent incomplete data packet so done with transfer\n");
         break;
       }
+
+    // parse error packet
     } else if (recvbuf[0] == 0 && recvbuf[1] == OPCODE_ERR) {
-      // XXX: perhaps print these to stderr regardless of verbosity
+      fprintf(stderr, "err packet, code %d\n", recvBlockNum);
       switch (recvBlockNum) {
       case 0:
         log("Error Code 0: Not defined, see error message (if any)\n");
@@ -233,6 +238,8 @@ int tftp_client(int port, int rflag, char *file_name, char *host_name) {
         log("Error Code 7: No such user\n");
         break;
       }
+      // Break out of while loop, ending transfer
+      break;
     } else {
       log("Opcode Mismatch... Expecting %s packets; ignoring packet\n",
         rflag ? "data" : "ack");
