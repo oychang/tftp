@@ -34,8 +34,8 @@ int tftp_server(const int port);
 // ===== Network interaction functions
 // Utility function that does the socket -> options -> sockaddr setup -> bind
 // processes all in one step, returning the new socket file descriptor.
-// port: what port to bind to (0 => ephemeral port) & sockaddr for data
-int get_bound_sockfd(const int port, struct sockaddr_in * sin);
+// port: what port to bind to (0 => ephemeral port)
+int get_bound_sockfd(const int port);
 // Returns a new, ready-to-use socket file descriptor for UDP (socket() step)
 int get_udp_sockfd(void);
 // Sets various operations on the socket with `setsockopt`.

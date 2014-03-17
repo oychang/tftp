@@ -102,7 +102,7 @@ int tftp_client(const int PORT, const int rflag, char *file_name,
     perror("sendto");
     exit(1);
   }
-  log("Sending %d bytes to %s, server default port: %d\n", numbytes,
+  log("Sending %d bytes to %s, server port: %d\n", numbytes,
       inet_ntoa(serveraddr.sin_addr), ntohs(serveraddr.sin_port));
   addrLen = sizeof(struct sockaddr_in);
   getsockname(sockfd, (struct sockaddr *)&myaddr, &addrLen);

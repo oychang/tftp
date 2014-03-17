@@ -4,13 +4,8 @@ int
 tftp_server(const int port)
 {
     // Setup listening on our pseudo well-known port.
-    struct sockaddr_in well_known_addr;
-    const int          well_known_sockfd = get_bound_sockfd(port,
-                                                &well_known_addr);
-    // These will change depending on whether we have a connection or not.
-    struct sockaddr_in ephemeral_addr;
+    const int          well_known_sockfd = get_bound_sockfd(port);
     int                current_sockfd = well_known_sockfd;
-    // Information about client
     struct sockaddr_in client_addr;
     // Hold information about block numbers, buffers, and byte counts.
     session_t          session = {IDLE, 0, "", NULL, -1, 0, {}, 0, {}};
@@ -31,7 +26,7 @@ tftp_server(const int port)
             log("initial connection...assigning ports\n");
             log("client sends packets from %d\n",
                 ntohs(client_addr.sin_port));
-            current_sockfd = get_bound_sockfd(0, &ephemeral_addr);
+            current_sockfd = get_bound_sockfd(0);
         }
 
         // Parse packet and prepare response
@@ -302,15 +297,17 @@ reset_session(session_t * session)
 }
 //=============================================================================
 int
-get_bound_sockfd(const int port, struct sockaddr_in * sin)
+get_bound_sockfd(const int port)
 {
+    struct sockaddr_in sin;
+
     int sockfd = get_udp_sockfd();
     if (sockfd == EXIT_FAILURE)
         return EXIT_FAILURE;
 
     set_socket_options(sockfd);
-    setup_my_sin(sin, port);
-    if (bind(sockfd, (struct sockaddr *)sin, sizeof(struct sockaddr)) == -1) {
+    setup_my_sin(&sin, port);
+    if (bind(sockfd, (struct sockaddr *)&sin, sizeof(struct sockaddr)) == -1) {
         perror("bind");
         return EXIT_FAILURE;
     }
