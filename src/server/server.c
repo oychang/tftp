@@ -128,6 +128,10 @@ parse_request_packet(session_t * session, int is_read)
     if (strstr(session->fn, "..") != NULL || session->fn[0] == '/') {
         prepare_error_packet(session, 2, "no up traversal");
         return SEND_RESET;
+    } else if (statret == -1 && is_read) {
+        log("could not stat file\n");
+        prepare_error_packet(session, 2, "could not stat file");
+        return SEND_RESET;
     } else if (!statret) {
         if (is_read && (statbuf.st_mode & UGOR) != UGOR) {
             prepare_error_packet(session, 2, "bad read permissions");
