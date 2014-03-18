@@ -117,7 +117,7 @@ int tftp_client(const int PORT, const int rflag, char *file_name,
     do {
       log("listening for packet\n");
       addrLen = sizeof(struct sockaddr);
-      numbytes = recvfrom(sockfd, recvbuf, MAXBUFLEN - 1, 0,
+      numbytes = recvfrom(sockfd, recvbuf, MAXBUFLEN, 0,
         (struct sockaddr *)&recvaddr, &addrLen);
     } while (numbytes == -1);
 
