@@ -20,7 +20,6 @@ typedef struct {
     unsigned int        block_n;
     string              fn;
     FILE *              file;
-    unsigned int        client_tid;
 
     ssize_t             recvbytes;
     buffer              recvbuf;

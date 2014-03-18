@@ -7,7 +7,7 @@ tftp_server(const int port)
     int                current_sockfd = get_bound_sockfd(port);
     struct sockaddr_in client_addr;
     // Hold information about block numbers, buffers, and byte counts.
-    session_t          session = {IDLE, 0, "", NULL, -1, 0, {}, 0, {}};
+    session_t          session = {IDLE, 0, "", NULL, 0, {}, 0, {}};
 
     // In this loop, we have to make sure that TIDs get sorted out.
     // Cases:
