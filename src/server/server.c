@@ -145,7 +145,7 @@ parse_request_packet(session_t * session, int is_read)
     if (is_read) {
         session->block_n = 1;
         prepare_data_packet(session);
-        return (session->recvbytes < 516) ? SEND_RESET : SEND;
+        return (session->sendbytes < 516) ? SEND_RESET : SEND;
     } else {
         session->block_n = 0;
         prepare_ack_packet(session);
