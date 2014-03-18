@@ -113,15 +113,13 @@ int tftp_client(const int PORT, const int rflag, char *file_name,
   blockNumber = rflag ? 1 : 0;
   while (true) {
     log("Waiting for packet\n");
-    addrLen = sizeof(struct sockaddr);
-    numbytes = recvfrom(sockfd, recvbuf, MAXBUFLEN - 1, 0,
-      (struct sockaddr *)&recvaddr, &addrLen);
-    while (numbytes == -1) {
-      log("Failed to receive packet from server; retrying.\n");
+
+    do {
+      log("listening for packet\n");
       addrLen = sizeof(struct sockaddr);
       numbytes = recvfrom(sockfd, recvbuf, MAXBUFLEN - 1, 0,
         (struct sockaddr *)&recvaddr, &addrLen);
-    }
+    } while (numbytes == -1);
 
     log("Got packet from %s, port %d\n",
       inet_ntoa(recvaddr.sin_addr), ntohs(recvaddr.sin_port));

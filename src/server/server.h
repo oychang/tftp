@@ -21,7 +21,7 @@
 //=============================================================================
 // if  0: will stay open for one request until termination
 // if ~0: will loop forever until sigkill -- daemon behavior
-#define LOOP_FOREVER 1
+#define LOOP_FOREVER 0
 // The amount of time a socket will block without data until it gives up
 #define TIMEOUT_SEC 10
 // Check if everyone can read (these are defined in sys/stat.h)
