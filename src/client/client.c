@@ -51,7 +51,15 @@ int tftp_client(const int PORT, const int rflag, char *file_name,
   // Specify values for the structure specifying the server address
   serveraddr.sin_family = AF_INET;
   serveraddr.sin_port = htons(PORT);
-  inet_pton(AF_INET, host_name, &serveraddr.sin_addr);
+  int ptonret = inet_pton(AF_INET, host_name, &serveraddr.sin_addr);
+  if (ptonret != 1) {
+    if (ptonret == 0) {
+      log("ptonret returned 0: not valid family address");
+    } else {
+      perror("ptonret");
+    }
+    exit(1);
+  }
   memset(&(serveraddr.sin_zero), '\0', 8);
 
   // Specify values for the structure specifying client's own address
