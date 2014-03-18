@@ -299,7 +299,6 @@ reset_session(session_t * session)
 int
 get_bound_sockfd(const int port)
 {
-
     int sockfd = get_udp_sockfd();
     if (sockfd == EXIT_FAILURE)
         return EXIT_FAILURE;
@@ -373,7 +372,7 @@ packet_listener(int sockfd, session_t * session, struct sockaddr_in * fromaddr)
     // XXX: We discard and do not check this value
     socklen_t fromaddr_len = sizeof(struct sockaddr);
     session->recvbytes = recvfrom(sockfd, session->recvbuf,
-        MAX_BUFFER_LEN - 1, 0, (struct sockaddr *)fromaddr, &fromaddr_len);
+        MAX_BUFFER_LEN, 0, (struct sockaddr *)fromaddr, &fromaddr_len);
 
     if (VERBOSE) {
         log("received %zd bytes\n", session->recvbytes);
