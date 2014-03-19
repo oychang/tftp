@@ -21,13 +21,13 @@ tftp_server(const int port)
     while (act == SEND || act == NOOP || LOOP_FOREVER) {
         packet_listener(current_sockfd, &session, &client_addr);
         // Check for proper TID (i.e. that port matches up to what we expect)
-        // if (session.status == IDLE && session.recvbytes > 0) {
-        //     log("initial connection...assigning ports\n");
-        //     log("client sends packets from %d\n",
-        //         ntohs(client_addr.sin_port));
-        //     close(current_sockfd);
-        //     current_sockfd = get_bound_sockfd(0);
-        // }
+        if (session.status == IDLE && session.recvbytes > 0) {
+            log("initial connection...assigning ports\n");
+            log("client sends packets from %d\n",
+                ntohs(client_addr.sin_port));
+            close(current_sockfd);
+            current_sockfd = get_bound_sockfd(0);
+        }
 
         // Parse packet and prepare response
         switch ((act = parse_packet(&session))) {
@@ -37,13 +37,13 @@ tftp_server(const int port)
         case SEND_RESET:
             send_packet(current_sockfd, &client_addr, &session);
             reset_session(&session);
-            // close(current_sockfd);
-            // current_sockfd = get_bound_sockfd(port);
+            close(current_sockfd);
+            current_sockfd = get_bound_sockfd(port);
             break;
         case RESET:
             reset_session(&session);
-            // close(current_sockfd);
-            // current_sockfd = get_bound_sockfd(port);
+            close(current_sockfd);
+            current_sockfd = get_bound_sockfd(port);
             break;
         case NOOP: default:
             break;
