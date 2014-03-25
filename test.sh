@@ -10,17 +10,10 @@ echo 'what is the remote ip?'
 read remoteaddr
 echo 'how about the port?'
 read remoteport
-echo '========================================'
 mkdir -p test
-echo 'Generating test data...'
-
+echo '========================================'
 echo 'test1.original = a (non-512 divisible) 640 bytes of printable ascii'
 ( (tr -dc A-Za-z0-9 </dev/urandom) | head -c 640 ) > test/test1.original
-# echo 'test2.original = empty file'
-# touch test/test2.original
-# echo 'test3.original = 1MB of random noise (uses 2 octets to store block num)'
-# dd if=/dev/urandom of=test/test3.original bs=1M count=1
-echo '========================================'
 echo 'sending test1...'
 cp test/test1.original test/test1.copy
 ./tftp -vwp $remoteport test/test1.copy $remoteaddr > test/test1-write.log
@@ -34,4 +27,41 @@ else
     echo $diffout
 fi
 echo '========================================'
+echo 'test2.original = empty file'
+touch test/test2.original
+cp test/test2.original test/test2.copy
+./tftp -vwp $remoteport test/test2.copy $remoteaddr > test/test2-write.log
+echo 'requesting test2...'
+./tftp -vrp $remoteport test/test2.copy $remoteaddr > test/test2-read.log
+
+diffout=$(diff test/test2.original test/test2.copy)
+if [[ -z "$diffout" ]]; then
+    echo 'original and copy are identical'
+else
+    echo 'original and copy are different'
+    echo $diffout
+fi
+echo '========================================'
+
+
+echo '========================================'
+echo 'test2.original = empty file'
+touch test/test2.original
+cp test/test2.original test/test2.copy
+./tftp -vwp $remoteport test/test2.copy $remoteaddr > test/test2-write.log
+echo 'requesting test2...'
+./tftp -vrp $remoteport test/test2.copy $remoteaddr > test/test2-read.log
+
+diffout=$(diff test/test2.original test/test2.copy)
+if [[ -z "$diffout" ]]; then
+    echo 'original and copy are identical'
+else
+    echo 'original and copy are different'
+    echo $diffout
+fi
+echo '========================================'
+echo 'test3.original = 1MB of random noise (uses 2 octets to store block num)'
+dd if=/dev/urandom of=test/test3.original bs=1M count=1
+
+
 echo 'Done'
